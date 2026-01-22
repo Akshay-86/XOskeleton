@@ -1,3 +1,4 @@
+import json
 import socket
 import random
 import time
@@ -138,10 +139,29 @@ def main():
         print("🚀 Connected! Sending data...\n")
 
         while True:
-            values = [random.randint(lo, hi) for lo, hi in LIMITS]
-            msg = ",".join(map(str, values)) + "\n"
+        # 🔥 JSON PAYLOAD
+            data = {
+                "moter_id": "SGHD4",
+                "ramdom_data": "ajh",
+                "temp": {
+                    "value": random.randint(20, 80),
+                    "units": "C"
+                },
+                "random_data": {
+                    "val1": {
+                        "val11": "rd",
+                        "val12": "rd1"
+                    },
+                    "val2": "random_data"
+                },
+                "random_data": "ramdom"
+            }
+
+            msg = json.dumps(data) + "\n"   # newline is IMPORTANT
             sock.send(msg.encode())
-            print(f"➡️  {msg.strip()}")
+
+            print("Sent JSON:")
+            print(msg)
             time.sleep(SEND_INTERVAL)
 
     except KeyboardInterrupt:
