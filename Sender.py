@@ -147,14 +147,14 @@ def main():
                     "value": random.randint(20, 80),
                     "units": "C"
                 },
-                "random_data": {
+                "random_dat": {
                     "val1": {
                         "val11": "rd",
                         "val12": "rd1"
                     },
                     "val2": "random_data"
                 },
-                "random_data": "ramdom"
+                "random_ata": "ramdom"
             }
 
             msg = json.dumps(data) + "\n"   # newline is IMPORTANT
