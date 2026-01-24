@@ -37,14 +37,11 @@ public class MainActivity extends AppCompatActivity {
     DeviceDiscoveryManager discoveryManager;
     BluetoothAdapter bluetoothAdapter;
 
-    // Launcher to handle the "Turn On Bluetooth" dialog result
     private final ActivityResultLauncher<Intent> enableBtLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
                 if (result.getResultCode() == RESULT_OK) {
-                    Toast.makeText(this, "Bluetooth Enabled", Toast.LENGTH_SHORT).show();
-                    loadPairedDevices(); // Load immediately after enabling
-                    startDiscovery();
+                    startScanningProcess();
                 } else {
                     Toast.makeText(this, "Bluetooth is required", Toast.LENGTH_SHORT).show();
                 }
@@ -67,35 +64,20 @@ public class MainActivity extends AppCompatActivity {
         Button btnScan = findViewById(R.id.btnScan);
         btnScan.setOnClickListener(v -> startScanningProcess());
 
-        // Initial Start
         startScanningProcess();
     }
 
-    /**
-     * The main entry point for scanning.
-     * 1. Checks Permissions
-     * 2. Checks if BT is Enabled
-     * 3. Loads Paired Devices
-     * 4. Starts Discovery
-     */
     private void startScanningProcess() {
-        // 1. Check Runtime Permissions First
         if (!hasPermissions()) {
             requestBluetoothPermissions();
             return;
         }
-
-        // 2. Check if Bluetooth is Enabled
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             enableBtLauncher.launch(enableBtIntent);
             return;
         }
-
-        // 3. Load already paired devices (So list isn't blank!)
         loadPairedDevices();
-
-        // 4. Scan for new ones
         startDiscovery();
     }
 
@@ -124,8 +106,6 @@ public class MainActivity extends AppCompatActivity {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-
-        // Add paired devices to the list immediately
         Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
         if (pairedDevices != null && !pairedDevices.isEmpty()) {
             for (BluetoothDevice device : pairedDevices) {
@@ -138,11 +118,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startDiscovery() {
-        if (discoveryManager != null) {
-            discoveryManager.stop();
-        }
-
-        // NOTE: We do NOT clear 'devices' here, because we want to keep the Paired devices visible
+        if (discoveryManager != null) discoveryManager.stop();
         discoveryManager = new DeviceDiscoveryManager(this, device -> {
             if (!devices.contains(device)) {
                 devices.add(device);
@@ -161,49 +137,57 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
-            // Already paired -> Go to Server Activity
-            openServerActivity();
+            // CASE 1: Already Paired -> Pass device to ClientActivity
+            openClientActivity(device);
         } else {
-            // Not paired -> Pair it
+            // CASE 2: Need to Pair -> Start pairing and listen for result
             Toast.makeText(this, "Pairing...", Toast.LENGTH_SHORT).show();
             device.createBond();
-            // Register receiver to listen for the result
+
             IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
             registerReceiver(bondReceiver, filter);
         }
     }
 
+    // --- CRITICAL FIX IN RECEIVER ---
     private final BroadcastReceiver bondReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(intent.getAction())) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                // 1. Extract device correctly (handling Android 13+)
+                BluetoothDevice device;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
+                } else {
+                    device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                }
+
+                // 2. Check if Bonded
                 if (device != null && device.getBondState() == BluetoothDevice.BOND_BONDED) {
                     Toast.makeText(context, "Paired Successfully!", Toast.LENGTH_SHORT).show();
+                    try { unregisterReceiver(this); } catch (Exception e) {}
 
-                    // SAFE UNREGISTER (Prevents Crash)
-                    try { unregisterReceiver(this); } catch (Exception e) { e.printStackTrace(); }
-
-                    openServerActivity();
+                    // 3. PASS THE DEVICE TO THE NEXT ACTIVITY
+                    openClientActivity(device);
                 }
             }
         }
     };
 
-    private void openServerActivity() {
-        Intent intent = new Intent(this, ServerActivity.class);
+    // --- CRITICAL FIX IN NAVIGATOR ---
+    private void openClientActivity(BluetoothDevice device) {
+        Intent intent = new Intent(this, ClientActivity.class);
+        // This line is what was missing or failing before:
+        intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
         startActivity(intent);
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQ_BT_PERMISSIONS) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startScanningProcess();
-            } else {
-                Toast.makeText(this, "Permissions Denied", Toast.LENGTH_SHORT).show();
-            }
+        if (requestCode == REQ_BT_PERMISSIONS && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startScanningProcess();
         }
     }
 
@@ -211,7 +195,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (discoveryManager != null) discoveryManager.stop();
-        // Prevent crash if receiver was never registered or already unregistered
         try { unregisterReceiver(bondReceiver); } catch (Exception e) {}
     }
 }
