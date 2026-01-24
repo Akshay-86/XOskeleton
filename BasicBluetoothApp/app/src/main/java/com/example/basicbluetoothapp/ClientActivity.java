@@ -65,6 +65,7 @@ public class ClientActivity extends AppCompatActivity {
 
     private void startConnectionProcess() {
         new Thread(() -> {
+            // Check permissions
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 runOnUiThread(() -> statusText.setText("Permission Denied"));
                 return;
@@ -73,10 +74,9 @@ public class ClientActivity extends AppCompatActivity {
             boolean connected = false;
             for (int port = 1; port <= 3; port++) {
                 int currentPort = port;
-                runOnUiThread(() -> {
-                    statusText.setText("Trying Port " + currentPort + "...");
-                    Toast.makeText(this, "Trying Port " + currentPort, Toast.LENGTH_SHORT).show();
-                });
+
+                // ONLY update text. Removed the Toast to prevent UI lag/confusion.
+                runOnUiThread(() -> statusText.setText("Trying Port " + currentPort + "..."));
 
                 if (connectToPort(port)) {
                     connected = true;
@@ -87,7 +87,11 @@ public class ClientActivity extends AppCompatActivity {
             if (connected) {
                 startReadingData();
             } else {
-                runOnUiThread(() -> statusText.setText("Failed to connect on ports 1, 2, or 3."));
+                // FIX: Toast must be inside runOnUiThread to prevent CRASH
+                runOnUiThread(() -> {
+                    statusText.setText("Failed to connect on ports 1, 2, or 3.");
+                    Toast.makeText(ClientActivity.this, "Connection Failed", Toast.LENGTH_SHORT).show();
+                });
             }
         }).start();
     }
@@ -168,7 +172,8 @@ public class ClientActivity extends AppCompatActivity {
             JSONObject json = new JSONObject(cleanJson);
             JsonUiRenderer.render(this, json, container);
         } catch (JSONException e) {
-            Log.e(TAG, "Parsing Error: " + rawData, e);
+            Toast.makeText(this, "Parsing Error: " + rawData, Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "Parsing Error: " + rawData, e);
             statusText.setText("Parsing Failed. Raw: " + rawData);
         }
     }

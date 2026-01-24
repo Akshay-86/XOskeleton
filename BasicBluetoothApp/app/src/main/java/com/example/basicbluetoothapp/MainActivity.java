@@ -11,6 +11,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -46,7 +47,9 @@ public class MainActivity extends AppCompatActivity {
                 if (result.getResultCode() == RESULT_OK) {
                     startScanningProcess();
                 } else {
+                    Log.e(TAG, "Bluetooth permission is denied");
                     Toast.makeText(this, "Bluetooth is required", Toast.LENGTH_SHORT).show();
+                    finish();
                 }
             }
     );
@@ -68,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
         btnScan.setOnClickListener(v -> {
             // Manual Scan: Force discovery even if paired
             startDiscovery();
+            Log.d(TAG, "Manual Scan Started");
         });
 
         startScanningProcess();
@@ -89,6 +93,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 3. AUTO-CONNECT: Check if PC is already paired
         if (tryAutoConnectToPairedDevice()) {
+            Log.d(TAG, "Auto-connect successful");
             return; // Skip discovery screen!
         }
 
@@ -115,6 +120,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+        Log.d(TAG, "No paired device found");
         return false;
     }
 
@@ -209,6 +215,7 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, ClientActivity.class);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
         startActivity(intent);
+        finish();
     }
 
     @Override
