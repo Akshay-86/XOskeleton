@@ -3,6 +3,9 @@
 *.aab
 *.ap_
 
+# Android App Bundles (legacy)
+*.apks
+
 # Files for the ART/Dalvik VM
 *.dex
 
@@ -12,8 +15,11 @@
 # Generated files
 /build/
 /app/build/
+**/build/
+**/app/build/
 /captures/
 .gradle/
+**/.gradle/
 gen/
 out/
 
@@ -30,7 +36,8 @@ local.properties
 *.iml
 *.ipr
 *.iws
-.idea/
+/.idea/
+**/.idea/
 modules.xml
 gradle.xml
 project.iml
@@ -41,6 +48,8 @@ project.iml
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild/
 .cxx/
+**/.externalNativeBuild/
+**/.cxx/
 
 # Google Services (e.g. APIs or Firebase) - typically checked in, but good to be aware of
 # google-services.json
@@ -51,6 +60,18 @@ project.iml
 *.pyc
 *.pyo
 *.pyd
+
+# Python caches + environments
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
 
 # Lint
 lint/reports/
@@ -66,3 +87,4 @@ lint/tmp/
 .DS_Store
 Thumbs.db
 ._*
+__pycache__

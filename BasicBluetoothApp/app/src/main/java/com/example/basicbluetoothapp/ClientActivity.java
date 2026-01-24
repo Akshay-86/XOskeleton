@@ -20,6 +20,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 
 public class ClientActivity extends AppCompatActivity {
 
@@ -34,7 +35,6 @@ public class ClientActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // UI Setup
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(32, 32, 32, 32);
@@ -50,7 +50,6 @@ public class ClientActivity extends AppCompatActivity {
 
         setContentView(root);
 
-        // Get Device from Intent
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             device = getIntent().getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
         } else {
@@ -72,7 +71,6 @@ public class ClientActivity extends AppCompatActivity {
             }
 
             boolean connected = false;
-            // Try ports 1 to 3
             for (int port = 1; port <= 3; port++) {
                 int currentPort = port;
                 runOnUiThread(() -> {
@@ -108,65 +106,67 @@ public class ClientActivity extends AppCompatActivity {
         return false;
     }
 
+    // =================================================================
+    // NEW: "FRAMING" PROTOCOL READER
+    // Matches the logic in framing.py: [2 Bytes Length][Payload]
+    // =================================================================
     private void startReadingData() {
-        runOnUiThread(() -> statusText.setText("Connected! Receiving Data..."));
+        runOnUiThread(() -> statusText.setText("Connected! Waiting for frames..."));
         isRunning = true;
 
         try {
             InputStream inputStream = socket.getInputStream();
-            StringBuilder buffer = new StringBuilder();
-            int openBraces = 0;
-            boolean insideObject = false;
 
             while (isRunning) {
-                int byteRead = inputStream.read();
-                if (byteRead == -1) break;
+                // 1. Read the Length Header (2 Bytes)
+                byte[] lengthHeader = new byte[2];
+                // Helper method to ensure we get exactly 2 bytes
+                readExactly(inputStream, lengthHeader, 2);
 
-                char c = (char) byteRead;
+                // 2. Decode Length (Big Endian: High Byte + Low Byte)
+                // Matches Python's: length.to_bytes(2, byteorder="big")
+                int payloadSize = ((lengthHeader[0] & 0xFF) << 8) | (lengthHeader[1] & 0xFF);
 
-                // 1. Detect start of JSON object
-                if (c == '{') {
-                    if (!insideObject) {
-                        insideObject = true;
-                        buffer.setLength(0); // Clear any garbage before the '{'
-                    }
-                    openBraces++;
-                }
+                // 3. Read the Payload (Exactly 'payloadSize' bytes)
+                byte[] payload = new byte[payloadSize];
+                readExactly(inputStream, payload, payloadSize);
 
-                // 2. Only append to buffer if we are inside a JSON object
-                if (insideObject) {
-                    buffer.append(c);
-                }
+                // 4. Convert Payload to String and Process
+                String jsonString = new String(payload, StandardCharsets.UTF_8);
 
-                // 3. Detect end of JSON object
-                if (c == '}' && insideObject) {
-                    openBraces--;
-                    if (openBraces == 0) {
-                        final String completeJson = buffer.toString().trim();
-                        runOnUiThread(() -> processReceivedData(completeJson));
-                        buffer.setLength(0);
-                        insideObject = false;
-                    }
-                }
+                runOnUiThread(() -> processReceivedData(jsonString));
             }
         } catch (IOException e) {
             Log.e(TAG, "Connection Lost", e);
-            runOnUiThread(() -> statusText.setText("Connection Lost: " + e.getMessage()));
+            runOnUiThread(() -> statusText.setText("Disconnected: " + e.getMessage()));
         } finally {
             closeSocket();
         }
     }
 
+    /**
+     * Helper to read EXACTLY numBytes.
+     * Prevents partial reads (which crash standard 'read' calls).
+     */
+    private void readExactly(InputStream in, byte[] buffer, int numBytes) throws IOException {
+        int bytesRead = 0;
+        while (bytesRead < numBytes) {
+            int result = in.read(buffer, bytesRead, numBytes - bytesRead);
+            if (result == -1) {
+                throw new IOException("End of stream reached unexpectedly");
+            }
+            bytesRead += result;
+        }
+    }
+
     private void processReceivedData(String rawData) {
         if (rawData == null || rawData.isEmpty()) return;
-
         try {
             statusText.setText("Live Data Received:");
-            // Replace single quotes with double quotes for valid JSON
+            // Basic cleanup just in case
             String cleanJson = rawData.replace("'", "\"");
             JSONObject json = new JSONObject(cleanJson);
             JsonUiRenderer.render(this, json, container);
-
         } catch (JSONException e) {
             Log.e(TAG, "Parsing Error: " + rawData, e);
             statusText.setText("Parsing Failed. Raw: " + rawData);

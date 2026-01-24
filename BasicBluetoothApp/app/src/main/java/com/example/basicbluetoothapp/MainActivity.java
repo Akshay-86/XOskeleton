@@ -11,7 +11,6 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -31,6 +30,10 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
     private static final int REQ_BT_PERMISSIONS = 101;
+
+    // TODO: CHANGE THIS TO YOUR PC's BLUETOOTH NAME!
+    // Example: "ubuntu-0", "Akshay-PC", "raspberrypi"
+    private static final String TARGET_DEVICE_NAME = "BR-CB-02";
 
     List<BluetoothDevice> devices = new ArrayList<>();
     DeviceListAdapter adapter;
@@ -62,23 +65,57 @@ public class MainActivity extends AppCompatActivity {
         recycler.setAdapter(adapter);
 
         Button btnScan = findViewById(R.id.btnScan);
-        btnScan.setOnClickListener(v -> startScanningProcess());
+        btnScan.setOnClickListener(v -> {
+            // Manual Scan: Force discovery even if paired
+            startDiscovery();
+        });
 
         startScanningProcess();
     }
 
     private void startScanningProcess() {
+        // 1. Check Permissions
         if (!hasPermissions()) {
             requestBluetoothPermissions();
             return;
         }
+
+        // 2. Check if Bluetooth is On
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             enableBtLauncher.launch(enableBtIntent);
             return;
         }
+
+        // 3. AUTO-CONNECT: Check if PC is already paired
+        if (tryAutoConnectToPairedDevice()) {
+            return; // Skip discovery screen!
+        }
+
+        // 4. If not found, show list and start discovery
         loadPairedDevices();
         startDiscovery();
+    }
+
+    private boolean tryAutoConnectToPairedDevice() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            return false;
+        }
+
+        Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+        if (pairedDevices != null) {
+            for (BluetoothDevice device : pairedDevices) {
+                String name = device.getName();
+
+                // Check if this paired device matches your target PC name
+                if (name != null && name.equals(TARGET_DEVICE_NAME)) {
+                    Toast.makeText(this, "Auto-connecting to " + name, Toast.LENGTH_SHORT).show();
+                    openClientActivity(device);
+                    return true; // Found it!
+                }
+            }
+        }
+        return false;
     }
 
     private boolean hasPermissions() {
@@ -106,19 +143,20 @@ public class MainActivity extends AppCompatActivity {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
+        devices.clear();
         Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-        if (pairedDevices != null && !pairedDevices.isEmpty()) {
-            for (BluetoothDevice device : pairedDevices) {
-                if (!devices.contains(device)) {
-                    devices.add(device);
-                }
-            }
+        if (pairedDevices != null) {
+            devices.addAll(pairedDevices);
             adapter.notifyDataSetChanged();
         }
     }
 
     private void startDiscovery() {
         if (discoveryManager != null) discoveryManager.stop();
+
+        // Ensure we keep the paired devices in the list when scanning starts
+        if (devices.isEmpty()) loadPairedDevices();
+
         discoveryManager = new DeviceDiscoveryManager(this, device -> {
             if (!devices.contains(device)) {
                 devices.add(device);
@@ -137,10 +175,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
-            // CASE 1: Already Paired -> Pass device to ClientActivity
             openClientActivity(device);
         } else {
-            // CASE 2: Need to Pair -> Start pairing and listen for result
             Toast.makeText(this, "Pairing...", Toast.LENGTH_SHORT).show();
             device.createBond();
 
@@ -149,13 +185,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // --- CRITICAL FIX IN RECEIVER ---
     private final BroadcastReceiver bondReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(intent.getAction())) {
-
-                // 1. Extract device correctly (handling Android 13+)
                 BluetoothDevice device;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
@@ -163,22 +196,17 @@ public class MainActivity extends AppCompatActivity {
                     device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 }
 
-                // 2. Check if Bonded
                 if (device != null && device.getBondState() == BluetoothDevice.BOND_BONDED) {
-                    Toast.makeText(context, "Paired Successfully!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(context, "Paired!", Toast.LENGTH_SHORT).show();
                     try { unregisterReceiver(this); } catch (Exception e) {}
-
-                    // 3. PASS THE DEVICE TO THE NEXT ACTIVITY
                     openClientActivity(device);
                 }
             }
         }
     };
 
-    // --- CRITICAL FIX IN NAVIGATOR ---
     private void openClientActivity(BluetoothDevice device) {
         Intent intent = new Intent(this, ClientActivity.class);
-        // This line is what was missing or failing before:
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
         startActivity(intent);
     }
