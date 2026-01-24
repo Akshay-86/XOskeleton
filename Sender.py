@@ -53,15 +53,15 @@ def main():
 
     try:
         while True:
-            data = {
+            data =''' {
                 "status": "connected",
-                "val": random.randint(0, 100),
-                "motor_temp": random.uniform(30.0, 45.0)
-            }
+                "val": ''' + str(random.randint(0, 100)) + ''',
+                "motor_temp": ''' + str(random.uniform(30.0, 45.0)) + '''
+            }'''
             # Send JSON + Newline
-            msg = json.dumps(data) + "\n"
-            client_sock.send(msg.encode())
-            print(f"Sent: {msg.strip()}")
+            # msg = json.dumps(data) + "\n"
+            client_sock.send(data.encode())
+            print(f"Sent: {data.strip()}")
             time.sleep(1)
             
     except Exception as e:
