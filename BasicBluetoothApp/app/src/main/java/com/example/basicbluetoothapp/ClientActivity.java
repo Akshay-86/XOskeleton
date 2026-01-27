@@ -35,20 +35,12 @@ public class ClientActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(32, 32, 32, 32);
+        // 1. Inflate the XML Layout
+        setContentView(R.layout.activity_client);
 
-        statusText = new TextView(this);
-        statusText.setText("Initializing...");
-        statusText.setTextSize(18);
-        root.addView(statusText);
-
-        container = new LinearLayout(this);
-        container.setOrientation(LinearLayout.VERTICAL);
-        root.addView(container);
-
-        setContentView(root);
+        // 2. Bind the Views using findViewById
+        statusText = findViewById(R.id.statusText);
+        container = findViewById(R.id.container);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             device = getIntent().getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
@@ -164,17 +156,28 @@ public class ClientActivity extends AppCompatActivity {
     }
 
     private void processReceivedData(String rawData) {
-        if (rawData == null || rawData.isEmpty()) return;
+        if (rawData == null) return;
+
         try {
-            statusText.setText("Live Data Received:");
-            // Basic cleanup just in case
-            String cleanJson = rawData.replace("'", "\"");
-            JSONObject json = new JSONObject(cleanJson);
+            // DEBUG: Log exactly what we got
+            Log.d(TAG, "Frame Received: " + rawData);
+
+            // 1. Show connection status + Last received time
+            String timestamp = java.text.DateFormat.getTimeInstance().format(new java.util.Date());
+            statusText.setText("Connected! Last Update: " + timestamp);
+
+            // 2. Try to parse JSON
+            JSONObject json = new JSONObject(rawData);
+
+            // 3. Render
             JsonUiRenderer.render(this, json, container);
+
         } catch (JSONException e) {
-            Toast.makeText(this, "Parsing Error: " + rawData, Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "Parsing Error: " + rawData, e);
-            statusText.setText("Parsing Failed. Raw: " + rawData);
+            // IF THIS RUNS, YOUR SERVER SENT BAD DATA
+            Log.e(TAG, "JSON Error: " + rawData, e);
+
+            // Show the error on screen so you can debug it
+            statusText.setText("Error Parsing Data!\nReceived:\n" + rawData);
         }
     }
 
