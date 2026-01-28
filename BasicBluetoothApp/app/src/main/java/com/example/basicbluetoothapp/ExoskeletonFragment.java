@@ -64,10 +64,23 @@ public class ExoskeletonFragment extends Fragment {
         // We don't call checkAndConnect() here because onResume() will run immediately after this anyway.
     }
 
+    // This runs when the App comes from background (e.g. User was on YouTube)
     @Override
     public void onResume() {
         super.onResume();
-        checkAndConnect();
+        if (!isHidden()) {
+            checkAndConnect();
+        }
+    }
+    
+    // NEW: This runs when switching TABS (Exo -> Profile -> Exo)
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        if (!hidden) {
+            // We are visible again! Refresh the UI.
+            checkAndConnect();
+        }
     }
 
     private void checkAndConnect() {
@@ -82,22 +95,19 @@ public class ExoskeletonFragment extends Fragment {
 
         btnChangeDevice.setText("Change Device (" + savedName + ")");
 
-        // CRITICAL FIX: Don't start a new connection if one is already in progress!
+        // RESTORE UI STATE: If already connected, update the text immediately
+        if (isRunning) {
+            statusText.setText("Status: Active (Connected)");
+        }
+
         if (isConnecting) return;
 
-        // If we are already running on the correct device, do nothing.
-        if (isRunning && currentConnectedMac != null && currentConnectedMac.equals(savedMac)) {
-            return;
+        // Only start a new connection if we aren't already running on this device
+        if (!isRunning || (currentConnectedMac != null && !currentConnectedMac.equals(savedMac))) {
+            if (isRunning) closeConnection();
+            BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(savedMac);
+            startConnectionProcess(device);
         }
-
-        // If we need to change devices, close the old one
-        if (isRunning || (currentConnectedMac != null && !currentConnectedMac.equals(savedMac))) {
-            closeConnection();
-        }
-
-        // Start fresh connection
-        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(savedMac);
-        startConnectionProcess(device);
     }
 
     private void startConnectionProcess(BluetoothDevice device) {
@@ -174,7 +184,8 @@ public class ExoskeletonFragment extends Fragment {
         try {
             InputStream inputStream = socket.getInputStream();
             while (isRunning) {
-                if (getActivity() == null) break;
+                // REMOVED: if (getActivity() == null) break;
+                // Don't kill the connection just because the screen is off!
 
                 byte[] lengthHeader = new byte[2];
                 readExactly(inputStream, lengthHeader, 2);
@@ -185,6 +196,8 @@ public class ExoskeletonFragment extends Fragment {
 
                 String jsonString = new String(payload, StandardCharsets.UTF_8);
 
+                // Only update UI if the screen is actually there.
+                // If not, we just keep reading data in the background silently.
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> processReceivedData(jsonString));
                 }
@@ -229,6 +242,7 @@ public class ExoskeletonFragment extends Fragment {
 
             JSONObject json = new JSONObject(rawData.replace("'", "\""));
             JsonUiRenderer.render(requireContext(), json, container);
+            Log.e("JSON", rawData);
         } catch (JSONException e) {
             statusText.setText("Parsing Error:\n" + rawData);
         }

@@ -36,7 +36,7 @@ def main():
     try:
         while True:
             # 1. Prepare JSON Data (Double quotes required for JSON)
-            data = '{ "status": "connected", "val": ' + str(random.randint(0, 100)) + ', "motor_temp": ' + str(round(random.uniform(30.0, 45.0), 2)) + ' }'
+            data = '{ "id": "sdgh", "val": ' + str(random.randint(0, 100)) + ', "motor_temp": ' + str(round(random.uniform(30.0, 45.0), 2)) + ' }'
             
             # 2. Convert string to bytes
             payload_bytes = data.encode('utf-8')
