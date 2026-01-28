@@ -14,7 +14,6 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -37,7 +36,11 @@ public class ExoskeletonFragment extends Fragment {
     private Button btnChangeDevice;
 
     private static BluetoothSocket socket;
-    private static boolean isRunning = false;
+
+    // FLAGS to control state
+    private static boolean isRunning = false;    // True only when data is flowing
+    private static boolean isConnecting = false; // True while we are trying to connect
+
     private static String currentConnectedMac = null;
 
     @Nullable
@@ -54,16 +57,13 @@ public class ExoskeletonFragment extends Fragment {
         container = view.findViewById(R.id.container);
         btnChangeDevice = view.findViewById(R.id.btnChangeDevice);
 
-        // Handle Button Click -> Open Scan Activity
         btnChangeDevice.setOnClickListener(v -> {
             Intent intent = new Intent(requireContext(), ScanActivity.class);
             startActivity(intent);
         });
-
-        checkAndConnect();
+        // We don't call checkAndConnect() here because onResume() will run immediately after this anyway.
     }
 
-    // Called every time this screen becomes visible (including when returning from ScanActivity)
     @Override
     public void onResume() {
         super.onResume();
@@ -71,57 +71,83 @@ public class ExoskeletonFragment extends Fragment {
     }
 
     private void checkAndConnect() {
-        // 1. Get saved MAC
         String savedMac = BluetoothPrefs.getLastAddress(requireContext());
         String savedName = BluetoothPrefs.getLastName(requireContext());
 
         if (savedMac == null) {
-            // STATE: No Device Saved
             statusText.setText("No device saved.");
             btnChangeDevice.setText("Add Device");
             return;
         }
 
-        // 2. Update Button Text
         btnChangeDevice.setText("Change Device (" + savedName + ")");
 
-        // 3. Check if we need to connect
-        // Connect if: Not running OR we switched to a different device
-        if (!isRunning || (currentConnectedMac != null && !currentConnectedMac.equals(savedMac))) {
+        // CRITICAL FIX: Don't start a new connection if one is already in progress!
+        if (isConnecting) return;
 
-            // If switching devices, close old one first
-            if (isRunning) closeConnection();
-
-            BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(savedMac);
-            startConnectionProcess(device);
+        // If we are already running on the correct device, do nothing.
+        if (isRunning && currentConnectedMac != null && currentConnectedMac.equals(savedMac)) {
+            return;
         }
+
+        // If we need to change devices, close the old one
+        if (isRunning || (currentConnectedMac != null && !currentConnectedMac.equals(savedMac))) {
+            closeConnection();
+        }
+
+        // Start fresh connection
+        BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(savedMac);
+        startConnectionProcess(device);
     }
 
     private void startConnectionProcess(BluetoothDevice device) {
+        isConnecting = true; // Lock: Prevent double threads
         currentConnectedMac = device.getAddress();
 
         new Thread(() -> {
-            if (getActivity() == null) return;
-            if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                updateStatus("Permission Denied");
+            // Safety Check
+            if (getActivity() == null) {
+                isConnecting = false;
                 return;
             }
 
+            // 1. Permissions Check
+            if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                updateStatus("Permission Denied");
+                isConnecting = false;
+                return;
+            }
+
+            // 2. CRITICAL FIX: Stop Scanning & Wait
+            // Scanning interferes with Connection. We force it to stop.
+            BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
+            try {
+                updateStatus("Initializing...");
+                Thread.sleep(600); // Give Bluetooth stack time to settle
+            } catch (InterruptedException ignored) {}
+
             boolean connected = false;
+
+            // 3. Try Ports
             for (int port = 1; port <= 3; port++) {
-                if (getActivity() == null) return;
+                if (getActivity() == null) break;
                 updateStatus("Connecting to " + device.getName() + " (Port " + port + ")...");
 
                 if (connectToPort(device, port)) {
                     connected = true;
                     break;
                 }
+
+                // Small pause between port attempts
+                try { Thread.sleep(200); } catch (Exception e) {}
             }
 
             if (connected) {
+                isConnecting = false; // Unlock
                 startReadingData();
             } else {
-                updateStatus("Connection Failed. Is the device on?");
+                updateStatus("Connection Failed. Is the server running?");
+                isConnecting = false; // Unlock
                 currentConnectedMac = null; // Reset so we can try again
             }
         }).start();
@@ -172,6 +198,7 @@ public class ExoskeletonFragment extends Fragment {
 
     private void closeConnection() {
         isRunning = false;
+        isConnecting = false; // Reset lock just in case
         currentConnectedMac = null;
         try {
             if (socket != null) socket.close();
@@ -179,8 +206,6 @@ public class ExoskeletonFragment extends Fragment {
             Log.e(TAG, "Error closing", e);
         }
     }
-
-    // --- Helpers ---
 
     private void updateStatus(String msg) {
         if (getActivity() != null) {

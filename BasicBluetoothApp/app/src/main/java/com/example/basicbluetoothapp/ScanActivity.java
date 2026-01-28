@@ -44,7 +44,7 @@ public class ScanActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_scan); // Make sure you create this XML below
+        setContentView(R.layout.activity_scan);
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -54,10 +54,73 @@ public class ScanActivity extends AppCompatActivity {
         recycler.setAdapter(adapter);
 
         Button btnScan = findViewById(R.id.btnScan);
-        btnScan.setOnClickListener(v -> startDiscovery());
+        btnScan.setOnClickListener(v -> startScanning());
 
         startScanning();
     }
+
+    private void handleDeviceClick(BluetoothDevice device) {
+        // 1. STOP DISCOVERY IMMEDIATELY
+        if (discoveryManager != null) discoveryManager.stop();
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+            bluetoothAdapter.cancelDiscovery();
+        }
+
+        // 2. CHECK IF ALREADY PAIRED
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
+
+        if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
+            // Already paired? Save and return immediately.
+            saveAndFinish(device);
+        } else {
+            // 3. START PAIRING
+            Toast.makeText(this, "Pairing with " + device.getName() + "...", Toast.LENGTH_SHORT).show();
+            device.createBond();
+
+            // 4. WAIT FOR RESULT (Do NOT finish activity yet)
+            IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+            registerReceiver(bondReceiver, filter);
+        }
+    }
+
+    private final BroadcastReceiver bondReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(intent.getAction())) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE);
+
+                // SUCCESS:
+                if (bondState == BluetoothDevice.BOND_BONDED) {
+                    Toast.makeText(context, "Pairing Successful!", Toast.LENGTH_SHORT).show();
+                    try { unregisterReceiver(this); } catch (Exception e) {}
+
+                    // Now we are allowed to save and leave
+                    saveAndFinish(device);
+                }
+                // FAILED:
+                else if (bondState == BluetoothDevice.BOND_NONE) {
+                    Toast.makeText(context, "Pairing Rejected or Failed.", Toast.LENGTH_SHORT).show();
+                    // We DO NOT finish. User stays here to try again.
+                }
+            }
+        }
+    };
+
+    private void saveAndFinish(BluetoothDevice device) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
+
+        String name = device.getName();
+        if (name == null) name = "Unknown Device";
+
+        // Only NOW do we update the preferences
+        BluetoothPrefs.saveDevice(this, name, device.getAddress());
+
+        // Return to Exoskeleton Fragment
+        finish();
+    }
+
+    // --- Standard Scanning Code ---
 
     private void startScanning() {
         if (!hasPermissions()) {
@@ -68,27 +131,9 @@ public class ScanActivity extends AppCompatActivity {
             enableBtLauncher.launch(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
             return;
         }
-
         loadPairedDevices();
         startDiscovery();
     }
-
-    private void handleDeviceClick(BluetoothDevice device) {
-        if (discoveryManager != null) discoveryManager.stop();
-
-        // 1. SAVE THE CHOSEN DEVICE
-        String name = "Unknown";
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-            name = device.getName();
-        }
-        BluetoothPrefs.saveDevice(this, name, device.getAddress());
-
-        // 2. CLOSE THIS SCREEN
-        Toast.makeText(this, "Saved " + name, Toast.LENGTH_SHORT).show();
-        finish(); // Go back to Exoskeleton Fragment
-    }
-
-    // --- Standard Boilerplate Below (Same as before) ---
 
     private void loadPairedDevices() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
@@ -101,6 +146,7 @@ public class ScanActivity extends AppCompatActivity {
     private void startDiscovery() {
         if (discoveryManager != null) discoveryManager.stop();
         if (devices.isEmpty()) loadPairedDevices();
+
         discoveryManager = new DeviceDiscoveryManager(this, device -> {
             if (!devices.contains(device)) {
                 devices.add(device);
@@ -142,5 +188,6 @@ public class ScanActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (discoveryManager != null) discoveryManager.stop();
+        try { unregisterReceiver(bondReceiver); } catch (Exception e) {}
     }
 }
