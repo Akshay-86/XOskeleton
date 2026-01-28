@@ -17,7 +17,8 @@ public class MainActivity extends AppCompatActivity {
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
         bottomNav.setOnItemSelectedListener(navListener);
 
-        // Load the default screen (Exoskeleton) when app starts
+        // DEFAULT SCREEN: Start with ExoskeletonFragment (Home)
+        // The "Add Device" button lives inside here now.
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.fragment_container, new ExoskeletonFragment())
