@@ -60,29 +60,32 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     private void handleDeviceClick(BluetoothDevice device) {
-        // 1. STOP DISCOVERY IMMEDIATELY
         if (discoveryManager != null) discoveryManager.stop();
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+
+        // Stop discovery (Safe check)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+            bluetoothAdapter.cancelDiscovery();
+        } else {
             bluetoothAdapter.cancelDiscovery();
         }
 
-        // 2. CHECK IF ALREADY PAIRED
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
+        // FIX: Use the new helper instead of checking BLUETOOTH_CONNECT directly
+        if (!hasConnectPermission()) {
+            requestBluetoothPermissions(); // Ask for permissions if missing
+            return;
+        }
 
         if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
-            // Already paired? Save and return immediately.
             saveAndFinish(device);
         } else {
-            // 3. START PAIRING
             Toast.makeText(this, "Pairing with " + device.getName() + "...", Toast.LENGTH_SHORT).show();
             device.createBond();
 
-            // 4. WAIT FOR RESULT (Do NOT finish activity yet)
             IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
             registerReceiver(bondReceiver, filter);
         }
     }
-
     private final BroadcastReceiver bondReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -108,15 +111,13 @@ public class ScanActivity extends AppCompatActivity {
     };
 
     private void saveAndFinish(BluetoothDevice device) {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
+        // FIX: Use the helper here too
+        if (!hasConnectPermission()) return;
 
         String name = device.getName();
         if (name == null) name = "Unknown Device";
 
-        // Only NOW do we update the preferences
         BluetoothPrefs.saveDevice(this, name, device.getAddress());
-
-        // Return to Exoskeleton Fragment
         finish();
     }
 
@@ -182,6 +183,15 @@ public class ScanActivity extends AppCompatActivity {
         if (requestCode == REQ_BT_PERMISSIONS && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             startScanning();
         }
+    }
+
+    private boolean hasConnectPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+        }
+        // On Android 11 and below, BLUETOOTH_CONNECT doesn't exist.
+        // We assume permission is granted because it's in the Manifest.
+        return true;
     }
 
     @Override

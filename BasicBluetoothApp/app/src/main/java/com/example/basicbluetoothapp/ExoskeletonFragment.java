@@ -34,6 +34,7 @@ public class ExoskeletonFragment extends Fragment {
     private LinearLayout container;
     private TextView statusText;
     private Button btnChangeDevice;
+    private long lastUiUpdate = 0;
 
     private static BluetoothSocket socket;
 
@@ -111,29 +112,36 @@ public class ExoskeletonFragment extends Fragment {
     }
 
     private void startConnectionProcess(BluetoothDevice device) {
-        isConnecting = true; // Lock: Prevent double threads
+        isConnecting = true;
         currentConnectedMac = device.getAddress();
 
         new Thread(() -> {
-            // Safety Check
             if (getActivity() == null) {
                 isConnecting = false;
                 return;
             }
 
-            // 1. Permissions Check
-            if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                updateStatus("Permission Denied");
-                isConnecting = false;
-                return;
+            // 1. FIXED PERMISSIONS CHECK
+            // On Android 12 (S) and newer, we MUST check BLUETOOTH_CONNECT.
+            // On Android 11 and older, we skip this check (it's implicit).
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    updateStatus("Permission Denied");
+                    isConnecting = false;
+                    return;
+                }
             }
 
-            // 2. CRITICAL FIX: Stop Scanning & Wait
-            // Scanning interferes with Connection. We force it to stop.
-            BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
+            // 2. Stop Scanning & Wait
+            // (Note: cancelDiscovery also needs a permission check on A12, but usually works fine without it on A11 if location is granted)
+            if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+                    || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
+                BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
+            }
+
             try {
                 updateStatus("Initializing...");
-                Thread.sleep(600); // Give Bluetooth stack time to settle
+                Thread.sleep(600);
             } catch (InterruptedException ignored) {}
 
             boolean connected = false;
@@ -141,24 +149,31 @@ public class ExoskeletonFragment extends Fragment {
             // 3. Try Ports
             for (int port = 1; port <= 3; port++) {
                 if (getActivity() == null) break;
-                updateStatus("Connecting to " + device.getName() + " (Port " + port + ")...");
+
+                // Note: device.getName() also requires permission on A12, but we can usually skip the check here
+                // since we already checked above, or use a try-catch for safety if you want to be super strict.
+                String deviceName = "Device";
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S || ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                    deviceName = device.getName();
+                }
+
+                updateStatus("Connecting to " + deviceName + " (Port " + port + ")...");
 
                 if (connectToPort(device, port)) {
                     connected = true;
                     break;
                 }
 
-                // Small pause between port attempts
                 try { Thread.sleep(200); } catch (Exception e) {}
             }
 
             if (connected) {
-                isConnecting = false; // Unlock
+                isConnecting = false;
                 startReadingData();
             } else {
                 updateStatus("Connection Failed. Is the server running?");
-                isConnecting = false; // Unlock
-                currentConnectedMac = null; // Reset so we can try again
+                isConnecting = false;
+                currentConnectedMac = null;
             }
         }).start();
     }
@@ -177,6 +192,7 @@ public class ExoskeletonFragment extends Fragment {
         return false;
     }
 
+
     private void startReadingData() {
         updateStatus("Connected! Waiting for data...");
         isRunning = true;
@@ -184,9 +200,7 @@ public class ExoskeletonFragment extends Fragment {
         try {
             InputStream inputStream = socket.getInputStream();
             while (isRunning) {
-                // REMOVED: if (getActivity() == null) break;
-                // Don't kill the connection just because the screen is off!
-
+                // 1. READ DATA
                 byte[] lengthHeader = new byte[2];
                 readExactly(inputStream, lengthHeader, 2);
                 int payloadSize = ((lengthHeader[0] & 0xFF) << 8) | (lengthHeader[1] & 0xFF);
@@ -196,10 +210,18 @@ public class ExoskeletonFragment extends Fragment {
 
                 String jsonString = new String(payload, StandardCharsets.UTF_8);
 
-                // Only update UI if the screen is actually there.
-                // If not, we just keep reading data in the background silently.
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> processReceivedData(jsonString));
+                // 2. LOG EVERYTHING (Fast)
+                // This will print every single packet, even if it's 1000 per second.
+                Log.d("DataStream", "Received: " + jsonString);
+
+                // 3. THROTTLE UI ONLY (Slow)
+                long currentTime = System.currentTimeMillis();
+                if (currentTime - lastUiUpdate > 100) { // 100ms delay
+                    lastUiUpdate = currentTime;
+
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> processReceivedData(jsonString));
+                    }
                 }
             }
         } catch (IOException e) {

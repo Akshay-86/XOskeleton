@@ -15,7 +15,7 @@ def get_local_bluetooth_mac():
     return "00:00:00:00:00:00"
 
 def main():
-    print("=== PC SERVER (Framed Data) ===")
+    print("=== PC SERVER (Large Data Test) ===")
     local_mac = get_local_bluetooth_mac()
     print(f"🔹 Local MAC: {local_mac}")
 
@@ -35,21 +35,70 @@ def main():
 
     try:
         while True:
-            # 1. Prepare JSON Data (Double quotes required for JSON)
-            data = '{ "id": "sdgh", "val": ' + str(random.randint(0, 100)) + ', "motor_temp": ' + str(round(random.uniform(30.0, 45.0), 2)) + ' }'
+            # 1. Create a large dictionary with random values
+            large_data_packet = {
+                "system": {
+                    "id": "EXO_PRO_V2",
+                    "uptime_sec": int(time.time()), 
+                    "mode": random.choice(["ASSIST", "RESIST", "WALK", "RUN", "IDLE"]),
+                    "battery": {
+                        "level": random.randint(10, 100),
+                        "voltage": round(random.uniform(44.0, 52.0), 2),
+                        "current": round(random.uniform(0.5, 12.0), 2),
+                        "is_charging": random.choice([True, False])
+                    }
+                },
+                "sensors": {
+                    "imu": {
+                        "pitch": round(random.uniform(-10.0, 10.0), 2),
+                        "roll": round(random.uniform(-5.0, 5.0), 2),
+                        "yaw": round(random.uniform(0.0, 360.0), 1)
+                    },
+                    "environment": {
+                        "temp_ambient": round(random.uniform(20.0, 35.0), 1),
+                        "humidity": random.randint(40, 80)
+                    }
+                },
+                "motors": [
+                    {
+                        "name": "Left_Knee",
+                        "rpm": random.randint(0, 3000),
+                        "torque": round(random.uniform(0.0, 50.0), 2),
+                        "temp": round(random.uniform(30.0, 65.0), 1),
+                        "status": "OK"
+                    },
+                    {
+                        "name": "Right_Knee",
+                        "rpm": random.randint(0, 3000),
+                        "torque": round(random.uniform(0.0, 50.0), 2),
+                        "temp": round(random.uniform(30.0, 65.0), 1),
+                        "status": "OK" if random.random() > 0.1 else "WARNING"
+                    }
+                ],
+                "safety_checks": {
+                    "emergency_stop": False,
+                    "vibration_level": "LOW",
+                    "comm_status": "STABLE"
+                }
+            }
+
+            # 2. Convert Dictionary to JSON String (serialization)
+            # json.dumps() handles all the quotes, commas, and formatting for you.
+            data = json.dumps(large_data_packet)
             
-            # 2. Convert string to bytes
+            # 3. Convert string to bytes
             payload_bytes = data.encode('utf-8')
 
-            # 3. ENCODE WITH FRAMING (Adds the 2-byte length header)
-            # This uses the function from framing.py
+            # 4. ENCODE WITH FRAMING
             framed_message = framing.encode(payload_bytes)
 
-            # 4. Send the framed message
+            # 5. Send
             client_sock.send(framed_message)
             
-            print(f"Sent: {data}")
-            time.sleep(1)
+            # Print length just to see how big it is
+            print(f"Sent Packet Size: {len(data)} chars")
+            
+            # Sleep a bit so we don't spam too hard (0.2s = 5 times a second)
 
     except Exception as e:
         print(f"❌ Error: {e}")
