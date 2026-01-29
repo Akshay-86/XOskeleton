@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.basicbluetoothapp"
+    namespace = "com.example.XOskeleton"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.basicbluetoothapp"
+        applicationId = "com.example.XOskeleton"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

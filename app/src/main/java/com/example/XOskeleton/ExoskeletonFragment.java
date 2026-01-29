@@ -1,4 +1,4 @@
-package com.example.basicbluetoothapp;
+package com.example.XOskeleton;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;

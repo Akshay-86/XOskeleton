@@ -1,4 +1,4 @@
-package com.example.basicbluetoothapp;
+package com.example.XOskeleton;
 
 import android.os.Bundle;
 import android.view.MenuItem;

@@ -1,4 +1,4 @@
-package com.example.basicbluetoothapp;
+package com.example.XOskeleton;
 
 import org.junit.Test;
 

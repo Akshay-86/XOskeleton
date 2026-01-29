@@ -1,4 +1,4 @@
-package com.example.basicbluetoothapp;
+package com.example.XOskeleton;
 
 import android.content.Context;
 import android.content.SharedPreferences;
