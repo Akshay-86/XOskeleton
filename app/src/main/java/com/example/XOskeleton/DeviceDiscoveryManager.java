@@ -16,10 +16,8 @@ import androidx.core.app.ActivityCompat;
 import java.util.ArrayList;
 import java.util.List;
 
-// --- CHANGE STARTS HERE ---
-// Remove 'extends Context'
+
 public class DeviceDiscoveryManager { // Changed from 'public class DeviceDiscoveryManager extends Context {'
-// --- CHANGE ENDS HERE ---
 
     private static final String TAG = "DeviceDiscoveryManager";
 

@@ -27,6 +27,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 public class ExoskeletonFragment extends Fragment {
 
@@ -35,7 +38,7 @@ public class ExoskeletonFragment extends Fragment {
     private TextView statusText;
     private Button btnChangeDevice;
     private long lastUiUpdate = 0;
-
+    private DataLogger logger;
     private static BluetoothSocket socket;
 
     // FLAGS to control state
@@ -193,14 +196,32 @@ public class ExoskeletonFragment extends Fragment {
     }
 
 
+    // COPY THESE VARIABLES TO THE TOP OF YOUR FRAGMENT CLASS
+    private double minClockOffset = Double.MAX_VALUE; // Start with max value
+    private boolean isFirstPacket = true;
+
     private void startReadingData() {
         updateStatus("Connected! Waiting for data...");
         isRunning = true;
 
+        // RESET METRICS FOR NEW CONNECTION
+        isFirstPacket = true;
+        minClockOffset = Double.MAX_VALUE; // Reset the latency baseline
+
+        long sessionStartTime = System.currentTimeMillis();
+        long totalBytesReceived = 0;
+        long localPacketCount = 0; // Used ONLY for calculating frequency (PPS)
+
+        logger = new DataLogger(requireContext());
+
+
+        SimpleDateFormat csvTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
+
         try {
             InputStream inputStream = socket.getInputStream();
+
             while (isRunning) {
-                // 1. READ DATA
+                // --- A. READ DATA ---
                 byte[] lengthHeader = new byte[2];
                 readExactly(inputStream, lengthHeader, 2);
                 int payloadSize = ((lengthHeader[0] & 0xFF) << 8) | (lengthHeader[1] & 0xFF);
@@ -210,15 +231,78 @@ public class ExoskeletonFragment extends Fragment {
 
                 String jsonString = new String(payload, StandardCharsets.UTF_8);
 
-                // 2. LOG EVERYTHING (Fast)
-                // This will print every single packet, even if it's 1000 per second.
-                Log.d("DataStream", "Received: " + jsonString);
+                // 1. Android Time (Precise Seconds)
+                double androidTimeSec = System.currentTimeMillis() / 1000.0;
 
-                // 3. THROTTLE UI ONLY (Slow)
-                long currentTime = System.currentTimeMillis();
-                if (currentTime - lastUiUpdate > 100) { // 100ms delay
-                    lastUiUpdate = currentTime;
 
+                // --- B. PARSE JSON (Server ID & Time) ---
+                double serverTimeSec = 0;
+                long serverPacketId = 0; // Default to 0 if missing
+                double latencyMs = 0;
+
+                try {
+                    JSONObject json = new JSONObject(jsonString);
+
+                    // Get the Timestamp for Latency
+                    if (json.has("ts")) serverTimeSec = json.getDouble("ts");
+
+                    // Get the REAL Packet ID for Loss Detection
+                    if (json.has("packet_id")) serverPacketId = json.getLong("packet_id");
+
+                } catch (JSONException e) { }
+
+
+                // --- C. CALCULATE AUTO-CALIBRATED LATENCY ---
+                if (serverTimeSec > 0) {
+                    // Calculate the raw difference between Phone and Server clocks
+                    double currentDiff = androidTimeSec - serverTimeSec;
+
+                    // LOGIC: If this packet has the smallest difference we've ever seen,
+                    // it means this was the "Fastest" transmission. Use it as the new Baseline.
+                    if (currentDiff < minClockOffset) {
+                        minClockOffset = currentDiff;
+                    }
+
+                    // Latency = How much slower this packet is compared to the fastest one
+                    latencyMs = (currentDiff - minClockOffset) * 1000.0;
+                }
+
+
+                // --- D. CALCULATE METRICS (Standard) ---
+                localPacketCount++; // We still count locally to calculate PPS (Speed)
+                int totalPacketSize = payloadSize + 2;
+                totalBytesReceived += totalPacketSize;
+
+                double elapsedSeconds = (androidTimeSec * 1000.0 - sessionStartTime) / 1000.0;
+                double kbPerSec = 0;
+                double pps = 0;
+
+                if (elapsedSeconds > 0) {
+                    kbPerSec = (totalBytesReceived / 1024.0) / elapsedSeconds;
+                    pps = localPacketCount / elapsedSeconds;
+                }
+
+
+                // --- E. SAVE TO CSV ---
+                String readableTime = csvTimeFormat.format(new Date());
+
+                // CRITICAL: We now save 'serverPacketId' in the first column
+                String csvLine = String.format(Locale.US, "%d,%s,%d,%.2f,%.2f,%.4f",
+                        serverPacketId,             // <--- SAVING THE SERVER'S ID
+                        readableTime,
+                        totalPacketSize,
+                        kbPerSec,
+                        pps,
+                        latencyMs
+                );
+
+                logger.save(csvLine);
+
+
+                // --- F. UPDATE UI ---
+                long currentTimeMs = System.currentTimeMillis();
+                if (currentTimeMs - lastUiUpdate > 100) {
+                    lastUiUpdate = currentTimeMs;
                     if (getActivity() != null) {
                         getActivity().runOnUiThread(() -> processReceivedData(jsonString));
                     }
