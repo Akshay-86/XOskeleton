@@ -46,6 +46,9 @@ public class ExoskeletonFragment extends Fragment {
     private static boolean isConnecting = false; // True while we are trying to connect
 
     private static String currentConnectedMac = null;
+    // Top of ExoskeletonFragment
+    private long pingStartTime = 0;
+    private double lastCalculatedRTT = 0;
 
     @Nullable
     @Override
@@ -204,16 +207,13 @@ public class ExoskeletonFragment extends Fragment {
         updateStatus("Connected! Waiting for data...");
         isRunning = true;
 
-        // RESET METRICS FOR NEW CONNECTION
-        isFirstPacket = true;
-        minClockOffset = Double.MAX_VALUE; // Reset the latency baseline
-
+        // Reset Metrics
         long sessionStartTime = System.currentTimeMillis();
         long totalBytesReceived = 0;
-        long localPacketCount = 0; // Used ONLY for calculating frequency (PPS)
+        long localPacketCount = 0;
 
+        // Force create a NEW file for every new connection
         logger = new DataLogger(requireContext());
-
 
         SimpleDateFormat csvTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
 
@@ -235,41 +235,38 @@ public class ExoskeletonFragment extends Fragment {
                 double androidTimeSec = System.currentTimeMillis() / 1000.0;
 
 
-                // --- B. PARSE JSON (Server ID & Time) ---
+                // --- B. PARSE JSON ---
                 double serverTimeSec = 0;
-                long serverPacketId = 0; // Default to 0 if missing
+                long serverPacketId = 0;
                 double latencyMs = 0;
 
                 try {
                     JSONObject json = new JSONObject(jsonString);
 
-                    // Get the Timestamp for Latency
+                    // Get Server Timestamp
                     if (json.has("ts")) serverTimeSec = json.getDouble("ts");
 
-                    // Get the REAL Packet ID for Loss Detection
+                    // Get Packet ID
                     if (json.has("packet_id")) serverPacketId = json.getLong("packet_id");
 
                 } catch (JSONException e) { }
 
 
-                // --- C. CALCULATE AUTO-CALIBRATED LATENCY ---
+                // --- C. RAW LATENCY (With "Negative Check") ---
                 if (serverTimeSec > 0) {
-                    // Calculate the raw difference between Phone and Server clocks
-                    double currentDiff = androidTimeSec - serverTimeSec;
+                    // 1. Calculate the raw difference
+                    double diffSec = androidTimeSec - serverTimeSec;
+                    latencyMs = diffSec * 1000.0;
 
-                    // LOGIC: If this packet has the smallest difference we've ever seen,
-                    // it means this was the "Fastest" transmission. Use it as the new Baseline.
-                    if (currentDiff < minClockOffset) {
-                        minClockOffset = currentDiff;
+                    // 2. THE FIX: If negative, force it to 0
+                    if (latencyMs < 0) {
+                        latencyMs = 0;
                     }
-
-                    // Latency = How much slower this packet is compared to the fastest one
-                    latencyMs = (currentDiff - minClockOffset) * 1000.0;
                 }
 
 
-                // --- D. CALCULATE METRICS (Standard) ---
-                localPacketCount++; // We still count locally to calculate PPS (Speed)
+                // --- D. CALCULATE METRICS ---
+                localPacketCount++;
                 int totalPacketSize = payloadSize + 2;
                 totalBytesReceived += totalPacketSize;
 
@@ -286,9 +283,8 @@ public class ExoskeletonFragment extends Fragment {
                 // --- E. SAVE TO CSV ---
                 String readableTime = csvTimeFormat.format(new Date());
 
-                // CRITICAL: We now save 'serverPacketId' in the first column
                 String csvLine = String.format(Locale.US, "%d,%s,%d,%.2f,%.2f,%.4f",
-                        serverPacketId,             // <--- SAVING THE SERVER'S ID
+                        serverPacketId,
                         readableTime,
                         totalPacketSize,
                         kbPerSec,
