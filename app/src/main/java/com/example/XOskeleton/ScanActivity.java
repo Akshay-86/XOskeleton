@@ -73,7 +73,7 @@ public class ScanActivity extends AppCompatActivity {
         // FIX: Use the new helper instead of checking BLUETOOTH_CONNECT directly
         if (!hasConnectPermission()) {
             requestBluetoothPermissions(); // Ask for permissions if missing
-            return;
+            return; // Don't finish here yet, wait for user response in onRequestPermissionsResult
         }
 
         if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
@@ -159,21 +159,28 @@ public class ScanActivity extends AppCompatActivity {
 
     private boolean hasPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12+: Check ONLY for Bluetooth keys.
+            // We DO NOT check for Location because we added 'neverForLocation' in Manifest.
             return checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
                     checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
         } else {
+            // Android 11 and below: WE HAVE NO CHOICE. We must ask for Location.
             return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         }
     }
 
     private void requestBluetoothPermissions() {
         List<String> permissions = new ArrayList<>();
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12+: Ask for Bluetooth ONLY. System will NOT show "Location" popup.
             permissions.add(Manifest.permission.BLUETOOTH_SCAN);
             permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
         } else {
+            // Android 11-: Must ask for Location.
             permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
         }
+
         ActivityCompat.requestPermissions(this, permissions.toArray(new String[0]), REQ_BT_PERMISSIONS);
     }
 

@@ -30,7 +30,7 @@ public class DataLogger {
 
                 if (isNewFile) {
                     // ADDED "latency_ms" to the end
-                    writer.append("packet_id,timestamp,packet_size,transmission_rate,frequency,latency_ms\n");
+                    writer.append("packet_id,timestamp,packet_size,transmission_rate,frequency,relativeLatencyMs,RTT,Latency(ms)RTT\n");
                 }
 
                 writer.append(csvLine + "\n");

@@ -25,6 +25,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -34,19 +35,24 @@ import java.util.Locale;
 public class ExoskeletonFragment extends Fragment {
 
     private static final String TAG = "ExoskeletonFragment";
+
+    // UI Elements
     private LinearLayout container;
     private TextView statusText;
     private Button btnChangeDevice;
-    private long lastUiUpdate = 0;
-    private DataLogger logger;
+
+    // Bluetooth Logic
     private static BluetoothSocket socket;
-
-    // FLAGS to control state
-    private static boolean isRunning = false;    // True only when data is flowing
-    private static boolean isConnecting = false; // True while we are trying to connect
-
+    private static boolean isConnecting = false;
     private static String currentConnectedMac = null;
-    // Top of ExoskeletonFragment
+    private boolean isRunning = false;
+
+    // Logging & Metrics
+    private DataLogger logger;
+    private long lastUiUpdate = 0;
+
+    // Latency & RTT Optimization Variables
+    private double minClockOffset = Double.MAX_VALUE;
     private long pingStartTime = 0;
     private double lastCalculatedRTT = 0;
 
@@ -59,35 +65,25 @@ public class ExoskeletonFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
         statusText = view.findViewById(R.id.statusText);
         container = view.findViewById(R.id.container);
         btnChangeDevice = view.findViewById(R.id.btnChangeDevice);
 
         btnChangeDevice.setOnClickListener(v -> {
-            Intent intent = new Intent(requireContext(), ScanActivity.class);
-            startActivity(intent);
+            startActivity(new Intent(requireContext(), ScanActivity.class));
         });
-        // We don't call checkAndConnect() here because onResume() will run immediately after this anyway.
     }
 
-    // This runs when the App comes from background (e.g. User was on YouTube)
     @Override
     public void onResume() {
         super.onResume();
-        if (!isHidden()) {
-            checkAndConnect();
-        }
+        if (!isHidden()) checkAndConnect();
     }
-    
-    // NEW: This runs when switching TABS (Exo -> Profile -> Exo)
+
     @Override
     public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
-        if (!hidden) {
-            // We are visible again! Refresh the UI.
-            checkAndConnect();
-        }
+        if (!hidden) checkAndConnect();
     }
 
     private void checkAndConnect() {
@@ -101,15 +97,10 @@ public class ExoskeletonFragment extends Fragment {
         }
 
         btnChangeDevice.setText("Change Device (" + savedName + ")");
-
-        // RESTORE UI STATE: If already connected, update the text immediately
-        if (isRunning) {
-            statusText.setText("Status: Active (Connected)");
-        }
+        if (isRunning) statusText.setText("Status: Active (Connected)");
 
         if (isConnecting) return;
 
-        // Only start a new connection if we aren't already running on this device
         if (!isRunning || (currentConnectedMac != null && !currentConnectedMac.equals(savedMac))) {
             if (isRunning) closeConnection();
             BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(savedMac);
@@ -122,14 +113,9 @@ public class ExoskeletonFragment extends Fragment {
         currentConnectedMac = device.getAddress();
 
         new Thread(() -> {
-            if (getActivity() == null) {
-                isConnecting = false;
-                return;
-            }
+            if (getActivity() == null) { isConnecting = false; return; }
 
-            // 1. FIXED PERMISSIONS CHECK
-            // On Android 12 (S) and newer, we MUST check BLUETOOTH_CONNECT.
-            // On Android 11 and older, we skip this check (it's implicit).
+            // Permission Check (Android 12+)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                 if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                     updateStatus("Permission Denied");
@@ -137,47 +123,26 @@ public class ExoskeletonFragment extends Fragment {
                     return;
                 }
             }
-
-            // 2. Stop Scanning & Wait
-            // (Note: cancelDiscovery also needs a permission check on A12, but usually works fine without it on A11 if location is granted)
-            if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
-                    || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
                 BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
             }
 
-            try {
-                updateStatus("Initializing...");
-                Thread.sleep(600);
-            } catch (InterruptedException ignored) {}
-
+            // Connection Loop (Try Ports 1-3)
             boolean connected = false;
-
-            // 3. Try Ports
             for (int port = 1; port <= 3; port++) {
                 if (getActivity() == null) break;
-
-                // Note: device.getName() also requires permission on A12, but we can usually skip the check here
-                // since we already checked above, or use a try-catch for safety if you want to be super strict.
-                String deviceName = "Device";
-                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S || ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                    deviceName = device.getName();
-                }
-
-                updateStatus("Connecting to " + deviceName + " (Port " + port + ")...");
-
+                updateStatus("Connecting to Port " + port + "...");
                 if (connectToPort(device, port)) {
                     connected = true;
                     break;
                 }
-
-                try { Thread.sleep(200); } catch (Exception e) {}
             }
 
             if (connected) {
                 isConnecting = false;
-                startReadingData();
+                startReadingData(); // Start the optimized loop
             } else {
-                updateStatus("Connection Failed. Is the server running?");
+                updateStatus("Connection Failed. Is server running?");
                 isConnecting = false;
                 currentConnectedMac = null;
             }
@@ -198,109 +163,130 @@ public class ExoskeletonFragment extends Fragment {
         return false;
     }
 
-
-    // COPY THESE VARIABLES TO THE TOP OF YOUR FRAGMENT CLASS
-    private double minClockOffset = Double.MAX_VALUE; // Start with max value
-    private boolean isFirstPacket = true;
-
+    // =========================================================================
+    //                    THE OPTIMIZED DATA LOOP
+    // =========================================================================
     private void startReadingData() {
-        updateStatus("Connected! Waiting for data...");
+        updateStatus("Connected! High Performance Mode");
         isRunning = true;
 
-        // Reset Metrics
+        // 1. Reset Metrics
         long sessionStartTime = System.currentTimeMillis();
         long totalBytesReceived = 0;
         long localPacketCount = 0;
+        int loopCounter = 0;
 
-        // Force create a NEW file for every new connection
+        // 2. Reset Latency
+        minClockOffset = Double.MAX_VALUE;
+        pingStartTime = 0;
+        lastCalculatedRTT = 0;
+
+        // 3. OPTIMIZATION: Create Logger & Buffers once (Outside Loop)
         logger = new DataLogger(requireContext());
-
+        byte[] lengthHeader = new byte[2]; // Reuse this buffer
+        StringBuilder csvBuilder = new StringBuilder(); // Reuse this for string building
+        Date dateObject = new Date(); // Reuse this object
         SimpleDateFormat csvTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
 
         try {
             InputStream inputStream = socket.getInputStream();
+            OutputStream outputStream = socket.getOutputStream();
 
             while (isRunning) {
-                // --- A. READ DATA ---
-                byte[] lengthHeader = new byte[2];
-                readExactly(inputStream, lengthHeader, 2);
-                int payloadSize = ((lengthHeader[0] & 0xFF) << 8) | (lengthHeader[1] & 0xFF);
-
-                byte[] payload = new byte[payloadSize];
-                readExactly(inputStream, payload, payloadSize);
-
-                String jsonString = new String(payload, StandardCharsets.UTF_8);
-
-                // 1. Android Time (Precise Seconds)
-                double androidTimeSec = System.currentTimeMillis() / 1000.0;
-
-
-                // --- B. PARSE JSON ---
-                double serverTimeSec = 0;
-                long serverPacketId = 0;
-                double latencyMs = 0;
-
-                try {
-                    JSONObject json = new JSONObject(jsonString);
-
-                    // Get Server Timestamp
-                    if (json.has("ts")) serverTimeSec = json.getDouble("ts");
-
-                    // Get Packet ID
-                    if (json.has("packet_id")) serverPacketId = json.getLong("packet_id");
-
-                } catch (JSONException e) { }
-
-
-                // --- C. RAW LATENCY (With "Negative Check") ---
-                if (serverTimeSec > 0) {
-                    // 1. Calculate the raw difference
-                    double diffSec = androidTimeSec - serverTimeSec;
-                    latencyMs = diffSec * 1000.0;
-
-                    // 2. THE FIX: If negative, force it to 0
-                    if (latencyMs < 0) {
-                        latencyMs = 0;
+                // --- A. SEND PING (Every ~20 packets) ---
+                loopCounter++;
+                if (loopCounter >= 20) {
+                    loopCounter = 0;
+                    if (pingStartTime == 0) {
+                        try {
+                            outputStream.write(1);
+                            outputStream.flush();
+                            pingStartTime = System.currentTimeMillis();
+                        } catch (IOException ignored) {}
                     }
                 }
 
+                // --- B. READ HEADER ---
+                // Optimized: read directly into the reusable buffer
+                readExactly(inputStream, lengthHeader, 2);
+                int payloadSize = ((lengthHeader[0] & 0xFF) << 8) | (lengthHeader[1] & 0xFF);
 
-                // --- D. CALCULATE METRICS ---
+                // --- C. READ PAYLOAD ---
+                // Note: We allocate here because payload size varies.
+                // If max size is constant, we could optimize this too.
+                byte[] payload = new byte[payloadSize];
+                readExactly(inputStream, payload, payloadSize);
+
+                // --- D. PROCESSING (Background Thread) ---
+                String jsonString = new String(payload, StandardCharsets.UTF_8);
+                double androidTimeSec = System.currentTimeMillis() / 1000.0;
+
+                double serverTimeSec = 0;
+                long serverPacketId = 0;
+                double relativeLatencyMs = 0;
+
+                // OPTIMIZATION: Parse JSON *ONCE* here
+                JSONObject json = null;
+                try {
+                    json = new JSONObject(jsonString);
+                    if (json.has("packet_id")) serverPacketId = json.getLong("packet_id");
+                    if (json.has("ts")) serverTimeSec = json.getDouble("ts");
+
+                    // Check Pong
+                    if (json.has("pong") && json.getBoolean("pong")) {
+                        if (pingStartTime > 0) {
+                            lastCalculatedRTT = (double) (System.currentTimeMillis() - pingStartTime);
+                            pingStartTime = 0;
+                        }
+                    }
+                } catch (JSONException ignored) {
+                    // Packet likely corrupt or partial, skip metrics update but keep running
+                }
+
+                // Calculate Latency
+                if (serverTimeSec > 0) {
+                    double currentDiff = androidTimeSec - serverTimeSec;
+                    if (currentDiff < minClockOffset) minClockOffset = currentDiff;
+                    relativeLatencyMs = (currentDiff - minClockOffset) * 1000.0;
+                }
+
+                // Metrics
                 localPacketCount++;
                 int totalPacketSize = payloadSize + 2;
                 totalBytesReceived += totalPacketSize;
-
                 double elapsedSeconds = (androidTimeSec * 1000.0 - sessionStartTime) / 1000.0;
+
                 double kbPerSec = 0;
                 double pps = 0;
-
                 if (elapsedSeconds > 0) {
                     kbPerSec = (totalBytesReceived / 1024.0) / elapsedSeconds;
                     pps = localPacketCount / elapsedSeconds;
                 }
 
+                // --- E. FAST LOGGING (StringBuilder) ---
+                // Re-using StringBuilder is much faster than String.format
+                dateObject.setTime(System.currentTimeMillis());
 
-                // --- E. SAVE TO CSV ---
-                String readableTime = csvTimeFormat.format(new Date());
+                csvBuilder.setLength(0); // Clear buffer
+                csvBuilder.append(serverPacketId).append(',')
+                        .append(csvTimeFormat.format(dateObject)).append(',')
+                        .append(totalPacketSize).append(',')
+                        .append(String.format(Locale.US, "%.2f", kbPerSec)).append(',')
+                        .append(String.format(Locale.US, "%.2f", pps)).append(',')
+                        .append(String.format(Locale.US, "%.4f", relativeLatencyMs)).append(',')
+                        .append(String.format(Locale.US, "%.2f", lastCalculatedRTT)).append(',')
+                        .append(String.format(Locale.US, "%.2f", lastCalculatedRTT / 2.0));
 
-                String csvLine = String.format(Locale.US, "%d,%s,%d,%.2f,%.2f,%.4f",
-                        serverPacketId,
-                        readableTime,
-                        totalPacketSize,
-                        kbPerSec,
-                        pps,
-                        latencyMs
-                );
+                logger.save(csvBuilder.toString());
 
-                logger.save(csvLine);
-
-
-                // --- F. UPDATE UI ---
+                // --- F. UI UPDATE (De-Jittered) ---
                 long currentTimeMs = System.currentTimeMillis();
                 if (currentTimeMs - lastUiUpdate > 100) {
                     lastUiUpdate = currentTimeMs;
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> processReceivedData(jsonString));
+                    if (getActivity() != null && json != null) {
+                        // OPTIMIZATION: Pass the ALREADY PARSED json to the UI
+                        final JSONObject finalJson = json;
+                        getActivity().runOnUiThread(() -> updateUi(finalJson));
                     }
                 }
             }
@@ -308,23 +294,6 @@ public class ExoskeletonFragment extends Fragment {
             Log.e(TAG, "Connection Lost", e);
             updateStatus("Disconnected: " + e.getMessage());
             closeConnection();
-        }
-    }
-
-    private void closeConnection() {
-        isRunning = false;
-        isConnecting = false; // Reset lock just in case
-        currentConnectedMac = null;
-        try {
-            if (socket != null) socket.close();
-        } catch (Exception e) {
-            Log.e(TAG, "Error closing", e);
-        }
-    }
-
-    private void updateStatus(String msg) {
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> statusText.setText(msg));
         }
     }
 
@@ -337,16 +306,28 @@ public class ExoskeletonFragment extends Fragment {
         }
     }
 
-    private void processReceivedData(String rawData) {
+    private void updateUi(JSONObject json) {
         try {
-            String timestamp = java.text.DateFormat.getTimeInstance().format(new java.util.Date());
+            String timestamp = java.text.DateFormat.getTimeInstance().format(new Date());
             statusText.setText("Status: Active\nLast Update: " + timestamp);
 
-            JSONObject json = new JSONObject(rawData.replace("'", "\""));
+            // Render without re-parsing!
             JsonUiRenderer.render(requireContext(), json, container);
-            Log.e("JSON", rawData);
-        } catch (JSONException e) {
-            statusText.setText("Parsing Error:\n" + rawData);
+        } catch (Exception e) {
+            statusText.setText("UI Error");
         }
+    }
+
+    private void updateStatus(String msg) {
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> statusText.setText(msg));
+        }
+    }
+
+    private void closeConnection() {
+        isRunning = false;
+        isConnecting = false;
+        currentConnectedMac = null;
+        try { if (socket != null) socket.close(); } catch (Exception ignored) {}
     }
 }
