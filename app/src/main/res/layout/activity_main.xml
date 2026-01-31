@@ -14,22 +14,74 @@
         android:background="?attr/colorPrimary"
         android:elevation="4dp"
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         app:popupTheme="@style/ThemeOverlay.AppCompat.Light">
 
         <!-- LEFT -->
         <ImageView
             android:layout_width="50dp"
             android:layout_height="50dp"
+            android:id="@+id/logo_header"
             android:layout_gravity="start|center_vertical"
             android:src="@drawable/logo1" />
 
         <!-- RIGHT -->
-        <ImageView
+        <LinearLayout
+            android:id="@+id/device_actions"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:src="@drawable/reconnect"
+            android:layout_margin="8dp"
             android:layout_gravity="end|center_vertical"
-            />
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/reconnect"
+                android:src="@drawable/bluetooth_off" />
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/disconnect"
+                android:layout_marginStart="18dp"
+                android:src="@drawable/reconnect" />
+
+
+        </LinearLayout>
+
+
+
+
+        <LinearLayout
+            android:id="@+id/device_details"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="8dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/device_name"
+                android:layout_width="wrap_content"
+                android:textSize="16sp"
+                android:text="Unknown Device"
+                android:textStyle="bold"
+                android:textColor="@color/light_secondary"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:id="@+id/device_mac"
+                android:layout_width="wrap_content"
+                android:textSize="12sp"
+                android:text="AA:BB:CC:DD:EE:FF"
+                android:textColor="@color/light_secondary_60"
+
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
 
     </androidx.appcompat.widget.Toolbar>
 
