@@ -2,7 +2,16 @@
     <!-- Base application theme. -->
     <style name="Base.Theme.BasicBluetoothApp" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/light_primary</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="colorPrimaryVariant">@color/light_primary</item>
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">@color/light_primary</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowTranslucentStatus">false</item>
+
+
     </style>
 
     <style name="Theme.BasicBluetoothApp" parent="Base.Theme.BasicBluetoothApp" />

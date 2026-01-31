@@ -3,7 +3,6 @@
     <item
         android:id="@+id/nav_exo"
         android:icon="@drawable/ic_exoskeleton"
-        
         android:title="Exoskeleton" />
 
     <item
