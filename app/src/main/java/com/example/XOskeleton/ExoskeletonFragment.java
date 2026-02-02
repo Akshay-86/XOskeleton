@@ -41,6 +41,9 @@ public class ExoskeletonFragment extends Fragment {
     private TextView statusText;
     private Button btnChangeDevice;
 
+    // CHANGED: Use 'View' instead of 'Button' because in XML it is an ImageView
+    private View btnReload;
+
     // Bluetooth Logic
     private static BluetoothSocket socket;
     private static boolean isConnecting = false;
@@ -69,9 +72,27 @@ public class ExoskeletonFragment extends Fragment {
         container = view.findViewById(R.id.container);
         btnChangeDevice = view.findViewById(R.id.btnChangeDevice);
 
+        // Correctly find the View (matches the ID in your XML)
+        btnReload = view.findViewById(R.id.btnReload);
+
+        // ORIGINAL BUTTON: Open Scan Activity
         btnChangeDevice.setOnClickListener(v -> {
             startActivity(new Intent(requireContext(), ScanActivity.class));
         });
+
+        // NEW BUTTON: Refresh / Reconnect Logic
+        // We add a safety check just in case
+        if (btnReload != null) {
+            btnReload.setOnClickListener(v -> {
+                if (isRunning) {
+                    // If currently connected, force disconnect first
+                    updateStatus("Refreshing connection...");
+                    closeConnection();
+                }
+                // Then try to connect again
+                checkAndConnect();
+            });
+        }
     }
 
     @Override

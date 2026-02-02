@@ -17,6 +17,11 @@
     <style name="App.Custom.Indicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">@color/light_primary_40</item>
     </style>
+    <style name="RoundedCornersImageView" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+
 
 
     <style name="Theme.BasicBluetoothApp" parent="Base.Theme.BasicBluetoothApp" />

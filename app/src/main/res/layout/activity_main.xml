@@ -48,17 +48,6 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/bluetooth_off" />
 
-            <ImageButton
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:clickable="true"
-                android:focusable="true"
-                android:id="@+id/disconnect"
-                android:padding="15dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/reconnect" />
-
-
         </LinearLayout>
 
 
