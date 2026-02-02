@@ -324,6 +324,20 @@ public class ExoskeletonFragment extends Fragment {
         }
     }
 
+    // Add this method anywhere in ExoskeletonFragment class
+    public void retryConnection() {
+        if (isRunning) {
+            updateStatus("Already connected!");
+            return;
+        }
+
+        // Reset flags to ensure we can try again
+        isConnecting = false;
+
+        updateStatus("Retrying connection...");
+        checkAndConnect(); // Call the existing connection logic
+    }
+
     private void closeConnection() {
         isRunning = false;
         isConnecting = false;
