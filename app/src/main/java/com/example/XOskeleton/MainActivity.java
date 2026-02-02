@@ -7,7 +7,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -15,76 +14,85 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
+
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
 
-    // Fragments
-    private final Fragment fragment1 = new ExoskeletonFragment();
-    private final Fragment fragment2 = new StatsFragment();
-    private final Fragment fragment3 = new ProfileFragment();
+    // --- 1. Fragment Management (Keeps Bluetooth Alive) ---
+    private final Fragment fragment1 = new ExoskeletonFragment(); // Home/Exo
+    private final Fragment fragment2 = new StatsFragment();       // Stats
+    private final Fragment fragment3 = new ProfileFragment();     // Profile
     private final FragmentManager fm = getSupportFragmentManager();
-    private Fragment active = fragment1;
+    private Fragment active = fragment1; // Track active fragment
 
-    // Toolbar
+    // --- 2. Toolbar UI Elements ---
     private TextView deviceNameText;
     private TextView deviceMacText;
-    private ImageButton btnStop;   // Icon: bluetooth_off
-    private ImageButton btnRetry;  // Icon: reconnect
+    private ImageButton btnDisconnect;
+    private ImageButton btnChangeDevice;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // --- Toolbar Setup ---
+        // --- A. Setup Custom Toolbar ---
         Toolbar toolbar = findViewById(R.id.my_toolbar);
         setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) getSupportActionBar().setDisplayShowTitleEnabled(false);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayShowTitleEnabled(false);
+        }
 
+        // --- B. Initialize Toolbar Views ---
         deviceNameText = findViewById(R.id.device_name);
         deviceMacText = findViewById(R.id.device_mac);
+        btnDisconnect = findViewById(R.id.reconnect);   // Icon: bluetooth_off
+        btnChangeDevice = findViewById(R.id.disconnect); // Icon: refresh/swap
 
-        // --- MAPPING BUTTONS CORRECTLY ---
-        // ID "reconnect" has the 'bluetooth_off' icon -> So it acts as STOP/DISCONNECT
-        btnStop = findViewById(R.id.reconnect);
-
-        // ID "disconnect" has the 'reconnect' icon -> So it acts as RETRY
-        btnRetry = findViewById(R.id.disconnect);
-
-        // --- Navigation Setup ---
+        // --- C. Setup Bottom Navigation ---
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
         bottomNav.setOnItemSelectedListener(navListener);
 
-        // Load Fragments
+        // --- D. Initialize Fragments (Add all, Hide others) ---
+        // We add them all once so they stay alive in memory
         fm.beginTransaction().add(R.id.fragment_container, fragment3, "3").hide(fragment3).commit();
         fm.beginTransaction().add(R.id.fragment_container, fragment2, "2").hide(fragment2).commit();
-        fm.beginTransaction().add(R.id.fragment_container, fragment1, "1").commit();
+        fm.beginTransaction().add(R.id.fragment_container, fragment1, "1").commit(); // Show Exo by default
 
+        // --- E. Setup Header Button Actions ---
         setupHeaderActions();
     }
 
-    private final BottomNavigationView.OnItemSelectedListener navListener = item -> {
-        int itemId = item.getItemId();
-        if (itemId == R.id.nav_exo) {
-            fm.beginTransaction().hide(active).show(fragment1).commit();
-            active = fragment1;
-            return true;
-        } else if (itemId == R.id.nav_stats) {
-            fm.beginTransaction().hide(active).show(fragment2).commit();
-            active = fragment2;
-            return true;
-        } else if (itemId == R.id.nav_profile) {
-            fm.beginTransaction().hide(active).show(fragment3).commit();
-            active = fragment3;
-            return true;
-        }
-        return false;
-    };
+    // --- Navigation Listener (Handles Tab Switching) ---
+    private final BottomNavigationView.OnItemSelectedListener navListener =
+            new BottomNavigationView.OnItemSelectedListener() {
+                @Override
+                public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                    int itemId = item.getItemId();
+
+                    // Using if-else to switch tabs
+                    if (itemId == R.id.nav_exo) {
+                        fm.beginTransaction().hide(active).show(fragment1).commit();
+                        active = fragment1;
+                        return true;
+                    } else if (itemId == R.id.nav_stats) {
+                        fm.beginTransaction().hide(active).show(fragment2).commit();
+                        active = fragment2;
+                        return true;
+                    } else if (itemId == R.id.nav_profile) {
+                        fm.beginTransaction().hide(active).show(fragment3).commit();
+                        active = fragment3;
+                        return true;
+                    }
+                    return false;
+                }
+            };
 
     @Override
     protected void onResume() {
         super.onResume();
+        // Update the header text every time we return to this activity
         updateHeaderInfo();
     }
 
@@ -97,51 +105,34 @@ public class MainActivity extends AppCompatActivity {
             deviceMacText.setText(mac);
             findViewById(R.id.device_details).setVisibility(View.VISIBLE);
         } else {
-            deviceNameText.setText("No Device");
-            deviceMacText.setText("Tap Scan to add");
+            deviceNameText.setText("No Device Connected");
+            deviceMacText.setText("Tap on the icon to connect");
+            // Optional: Hide details view if preferred
         }
     }
 
     @SuppressLint("DetachAndAttachSameFragment")
     private void setupHeaderActions() {
-        // --- BUTTON 1: RETRY CONNECTION (Circular Arrows Icon) ---
-        btnRetry.setOnClickListener(v -> {
-            String savedMac = BluetoothPrefs.getLastAddress(this);
-
-            if (savedMac == null) {
-                // If no device is saved, this button acts as "Open Scanner"
-                startActivity(new Intent(MainActivity.this, ScanActivity.class));
-            } else {
-                // If device IS saved, try to reconnect to it
-                if (active instanceof ExoskeletonFragment) {
-                    ((ExoskeletonFragment) active).retryConnection();
-                    Toast.makeText(this, "Retrying Connection...", Toast.LENGTH_SHORT).show();
-                } else {
-                    // If user is on Profile/Stats tab, switch to Home tab first, then retry
-                    BottomNavigationView nav = findViewById(R.id.bottom_navigation);
-                    nav.setSelectedItemId(R.id.nav_exo);
-                    ((ExoskeletonFragment) fragment1).retryConnection();
-                }
-            }
+        // 1. Change Device Button (Refresh Icon)
+        btnChangeDevice.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, ScanActivity.class);
+            startActivity(intent);
         });
 
-        // Long Press on Retry Icon -> Force Open Scanner (Just in case)
-        btnRetry.setOnLongClickListener(v -> {
-            startActivity(new Intent(MainActivity.this, ScanActivity.class));
-            return true;
-        });
-
-
-        // --- BUTTON 2: DISCONNECT / STOP (Power Off Icon) ---
-        btnStop.setOnClickListener(v -> {
-            // 1. Wipe Save Data
+        // 2. Disconnect Button (Bluetooth Off Icon)
+        btnDisconnect.setOnClickListener(v -> {
+            // Clear Preferences
             BluetoothPrefs.clearDevice(this);
             updateHeaderInfo();
 
-            // 2. Reload the Main Fragment (Effectively killing the connection)
-            fm.beginTransaction().detach(fragment1).attach(fragment1).commit();
-
-            Toast.makeText(this, "Disconnected", Toast.LENGTH_SHORT).show();
+            // Refresh the Active Fragment to reflect the "Disconnected" state
+            // If we are on the Exo tab, we simply hide and show it to trigger 'onHiddenChanged'
+            // or we can just detach/attach it to force a reload.
+            // For now, simpler is better:
+            if (active instanceof ExoskeletonFragment) {
+                // Force a reload of the Exo fragment to stop the connection
+                fm. beginTransaction().detach(fragment1).attach(fragment1).commit();
+            }
         });
     }
 }
