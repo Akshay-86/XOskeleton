@@ -1,14 +1,12 @@
 package com.example.XOskeleton;
 
-import android.content.Intent;
+import android.annotation.SuppressLint;
 import android.os.Bundle;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
@@ -19,23 +17,23 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 public class MainActivity extends AppCompatActivity {
 
     // Fragments
-    private final Fragment fragment1 = new ExoskeletonFragment();
-    private final Fragment fragment2 = new StatsFragment();
-    private final Fragment fragment3 = new ProfileFragment();
+    private final Fragment fragment1 = new ExoskeletonFragment(); // Home
+    private final Fragment fragment2 = new StatsFragment();       // Stats
+    private final Fragment fragment3 = new ProfileFragment();     // Profile
     private final FragmentManager fm = getSupportFragmentManager();
     private Fragment active = fragment1;
 
-    // Toolbar
+    // Toolbar Elements
     private TextView deviceNameText;
     private TextView deviceMacText;
-    private ImageButton btnStop;   // Icon: bluetooth_off
+    private ImageButton btnStop;   // The "Power Off" / Disconnect icon
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // --- Toolbar Setup ---
+        // --- 1. Toolbar Setup ---
         Toolbar toolbar = findViewById(R.id.my_toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) getSupportActionBar().setDisplayShowTitleEnabled(false);
@@ -43,40 +41,37 @@ public class MainActivity extends AppCompatActivity {
         deviceNameText = findViewById(R.id.device_name);
         deviceMacText = findViewById(R.id.device_mac);
 
-        // --- MAPPING BUTTONS CORRECTLY ---
-        // ID "reconnect" has the 'bluetooth_off' icon -> So it acts as STOP/DISCONNECT
+        // This button ID is 'reconnect' in XML, but uses the 'bluetooth_off' icon
         btnStop = findViewById(R.id.reconnect);
 
-
-        // --- Navigation Setup ---
+        // --- 2. Navigation Setup ---
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
-        bottomNav.setOnItemSelectedListener(navListener);
+        bottomNav.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.nav_exo) {
+                fm.beginTransaction().hide(active).show(fragment1).commit();
+                active = fragment1;
+                return true;
+            } else if (itemId == R.id.nav_stats) {
+                fm.beginTransaction().hide(active).show(fragment2).commit();
+                active = fragment2;
+                return true;
+            } else if (itemId == R.id.nav_profile) {
+                fm.beginTransaction().hide(active).show(fragment3).commit();
+                active = fragment3;
+                return true;
+            }
+            return false;
+        });
 
-        // Load Fragments
+        // --- 3. Initialize Fragments ---
+        // Add all fragments to the manager but hide Stats and Profile
         fm.beginTransaction().add(R.id.fragment_container, fragment3, "3").hide(fragment3).commit();
         fm.beginTransaction().add(R.id.fragment_container, fragment2, "2").hide(fragment2).commit();
         fm.beginTransaction().add(R.id.fragment_container, fragment1, "1").commit();
 
         setupHeaderActions();
     }
-
-    private final BottomNavigationView.OnItemSelectedListener navListener = item -> {
-        int itemId = item.getItemId();
-        if (itemId == R.id.nav_exo) {
-            fm.beginTransaction().hide(active).show(fragment1).commit();
-            active = fragment1;
-            return true;
-        } else if (itemId == R.id.nav_stats) {
-            fm.beginTransaction().hide(active).show(fragment2).commit();
-            active = fragment2;
-            return true;
-        } else if (itemId == R.id.nav_profile) {
-            fm.beginTransaction().hide(active).show(fragment3).commit();
-            active = fragment3;
-            return true;
-        }
-        return false;
-    };
 
     @Override
     protected void onResume() {
@@ -98,18 +93,23 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @SuppressLint("DetachAndAttachSameFragment")
     private void setupHeaderActions() {
-
-        // --- BUTTON 2: DISCONNECT / STOP (Power Off Icon) ---
+        // --- STOP / DISCONNECT BUTTON LOGIC ---
         btnStop.setOnClickListener(v -> {
-            // 1. Wipe Save Data
+            // 1. Wipe Saved Data (Forget Device)
+            // Note: Ensure your BluetoothPrefs class has the method 'clearDevice' or 'clear'
             BluetoothPrefs.clearDevice(this);
+
+            // 2. Update Header Immediately to show "No Device"
             updateHeaderInfo();
 
-            // 2. Reload the Main Fragment (Effectively killing the connection)
+            // 3. Force Reload the Exoskeleton Fragment
+            // This triggers onPause() (disconnects bluetooth) -> onResume() (checks prefs)
+            // Since prefs are now empty, the Fragment will set its button to "Add Device"
             fm.beginTransaction().detach(fragment1).attach(fragment1).commit();
 
-            Toast.makeText(this, "Disconnected", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Disconnected & Device Forgotten", Toast.LENGTH_SHORT).show();
         });
     }
 }

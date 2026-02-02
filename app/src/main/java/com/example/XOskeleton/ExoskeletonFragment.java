@@ -302,7 +302,7 @@ public class ExoskeletonFragment extends Fragment {
 
                 // --- F. UI UPDATE (De-Jittered) ---
                 long currentTimeMs = System.currentTimeMillis();
-                if (currentTimeMs - lastUiUpdate > 100) {
+                if (currentTimeMs - lastUiUpdate > 330) {
                     lastUiUpdate = currentTimeMs;
                     if (getActivity() != null && json != null) {
                         // OPTIMIZATION: Pass the ALREADY PARSED json to the UI
