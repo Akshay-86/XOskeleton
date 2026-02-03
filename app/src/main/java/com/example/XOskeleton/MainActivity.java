@@ -16,12 +16,13 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
 
-    // Fragments
-    private final Fragment fragment1 = new ExoskeletonFragment(); // Home
-    private final Fragment fragment2 = new StatsFragment();       // Stats
-    private final Fragment fragment3 = new ProfileFragment();     // Profile
+    // Fragments - Removed "final = new ..." to prevent duplicates
+    private Fragment fragment1; // Exo (Home)
+    private Fragment fragment2; // Stats
+    private Fragment fragment3; // Profile
+
     private final FragmentManager fm = getSupportFragmentManager();
-    private Fragment active = fragment1;
+    private Fragment active; // Tracks the currently visible tab
 
     // Toolbar Elements
     private TextView deviceNameText;
@@ -44,7 +45,34 @@ public class MainActivity extends AppCompatActivity {
         // This button ID is 'reconnect' in XML, but uses the 'bluetooth_off' icon
         btnStop = findViewById(R.id.reconnect);
 
-        // --- 2. Navigation Setup ---
+        // --- 2. Initialize Fragments (THE CRITICAL FIX) ---
+        if (savedInstanceState == null) {
+            // First Launch: Create NEW fragments
+            fragment1 = new ExoskeletonFragment();
+            fragment2 = new StatsFragment();
+            fragment3 = new ProfileFragment();
+
+            // Add them all, hide Stats/Profile, show Exo
+            fm.beginTransaction().add(R.id.fragment_container, fragment3, "3").hide(fragment3).commit();
+            fm.beginTransaction().add(R.id.fragment_container, fragment2, "2").hide(fragment2).commit();
+            fm.beginTransaction().add(R.id.fragment_container, fragment1, "1").commit();
+
+            active = fragment1;
+        } else {
+            // App Restarted (Theme Change/Rotation): RECOVER existing fragments
+            // Android automatically saves them; we just need to find them by Tag
+            fragment1 = fm.findFragmentByTag("1");
+            fragment2 = fm.findFragmentByTag("2");
+            fragment3 = fm.findFragmentByTag("3");
+
+            // Restore the 'active' pointer to whichever one is currently visible
+            if (fragment1 != null && !fragment1.isHidden()) active = fragment1;
+            else if (fragment2 != null && !fragment2.isHidden()) active = fragment2;
+            else if (fragment3 != null && !fragment3.isHidden()) active = fragment3;
+            else active = fragment1; // Fallback
+        }
+
+        // --- 3. Navigation Setup ---
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
@@ -63,12 +91,6 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
-
-        // --- 3. Initialize Fragments ---
-        // Add all fragments to the manager but hide Stats and Profile
-        fm.beginTransaction().add(R.id.fragment_container, fragment3, "3").hide(fragment3).commit();
-        fm.beginTransaction().add(R.id.fragment_container, fragment2, "2").hide(fragment2).commit();
-        fm.beginTransaction().add(R.id.fragment_container, fragment1, "1").commit();
 
         setupHeaderActions();
     }
@@ -98,16 +120,16 @@ public class MainActivity extends AppCompatActivity {
         // --- STOP / DISCONNECT BUTTON LOGIC ---
         btnStop.setOnClickListener(v -> {
             // 1. Wipe Saved Data (Forget Device)
-            // Note: Ensure your BluetoothPrefs class has the method 'clearDevice' or 'clear'
             BluetoothPrefs.clearDevice(this);
 
             // 2. Update Header Immediately to show "No Device"
             updateHeaderInfo();
 
             // 3. Force Reload the Exoskeleton Fragment
-            // This triggers onPause() (disconnects bluetooth) -> onResume() (checks prefs)
-            // Since prefs are now empty, the Fragment will set its button to "Add Device"
-            fm.beginTransaction().detach(fragment1).attach(fragment1).commit();
+            // We use 'fragment1' specifically because that's where the Bluetooth connection lives
+            if (fragment1 != null) {
+                fm.beginTransaction().detach(fragment1).attach(fragment1).commit();
+            }
 
             Toast.makeText(this, "Disconnected & Device Forgotten", Toast.LENGTH_SHORT).show();
         });
