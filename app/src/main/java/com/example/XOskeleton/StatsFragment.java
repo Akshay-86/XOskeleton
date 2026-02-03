@@ -5,10 +5,12 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.XAxis;
@@ -19,8 +21,11 @@ import com.github.mikephil.charting.data.LineDataSet;
 
 public class StatsFragment extends Fragment {
 
-    private LineChart chart;
-    private Thread simulatorThread; // For testing only
+    private LineChart chartVoltage;
+    private LineChart chartCurrent;
+    private LineChart chartSpeed;
+    private ExoViewModel viewModel; // The Shared Data Box
+    private float globalX = 0f; // Continually increasing X value
 
     @Nullable
     @Override
@@ -32,113 +37,98 @@ public class StatsFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        chart = view.findViewById(R.id.lineChart);
-        setupChart();
+        // 1. Bind Views
+        chartVoltage = view.findViewById(R.id.chartVoltage);
+        chartCurrent = view.findViewById(R.id.chartCurrent);
+        chartSpeed = view.findViewById(R.id.chartSpeed);
+
+        // 2. Configure Charts
+        setupChart(chartVoltage, Color.parseColor("#FF5722")); // Orange
+        setupChart(chartCurrent, Color.parseColor("#2196F3")); // Blue
+        setupChart(chartSpeed, Color.parseColor("#4CAF50"));   // Green
+
+        // 3. Connect to Data Stream
+        viewModel = new ViewModelProvider(requireActivity()).get(ExoViewModel.class);
+
+        // 4. Start Watching for Updates
+        viewModel.voltage.observe(getViewLifecycleOwner(), value -> addEntry(chartVoltage, value));
+        viewModel.current.observe(getViewLifecycleOwner(), value -> addEntry(chartCurrent, value));
+        viewModel.speed.observe(getViewLifecycleOwner(), value -> addEntry(chartSpeed, value));
     }
 
-    private void setupChart() {
-        // 1. Configure Chart styling
-        chart.getDescription().setEnabled(false);
-        chart.setTouchEnabled(true);
-        chart.setDragEnabled(true);
-        chart.setScaleEnabled(true);
-        chart.setDrawGridBackground(false);
-        chart.setPinchZoom(true);
-        chart.setBackgroundColor(Color.WHITE);
-
-        // 2. Setup Empty Data
-        LineData data = new LineData();
-        data.setValueTextColor(Color.BLACK);
-        chart.setData(data);
-
-        // 3. Customize X-Axis (Bottom)
-        XAxis xl = chart.getXAxis();
-        xl.setTextColor(Color.BLACK);
-        xl.setDrawGridLines(false);
-        xl.setAvoidFirstLastClipping(true);
-        xl.setEnabled(true);
-
-        // 4. Customize Y-Axis (Left)
-        YAxis leftAxis = chart.getAxisLeft();
-        leftAxis.setTextColor(Color.BLACK);
-        leftAxis.setDrawGridLines(true);
-        leftAxis.setGridColor(Color.LTGRAY);
-
-        // 5. Disable Right Axis
-        YAxis rightAxis = chart.getAxisRight();
-        rightAxis.setEnabled(false);
-    }
-
-    // --- PUBLIC METHOD: Call this from anywhere to add a point ---
-    public void addEntry(float value) {
-        if (chart == null) return;
-
+    // --- HELPER: Pushes a new point to the graph ---
+    private void addEntry(LineChart chart, float value) {
         LineData data = chart.getData();
-        if (data != null) {
-            LineDataSet set = (LineDataSet) data.getDataSetByIndex(0);
-
-            // Create Set if it doesn't exist yet
-            if (set == null) {
-                set = createSet();
-                data.addDataSet(set);
-            }
-
-            // Add Entry
-            data.addEntry(new Entry(set.getEntryCount(), value), 0);
-            data.notifyDataChanged();
-
-            // Refresh Chart
-            chart.notifyDataSetChanged();
-            chart.setVisibleXRangeMaximum(50); // Show only last 50 points
-            chart.moveViewToX(data.getEntryCount()); // Scroll to end
+        if (data == null) {
+            data = new LineData();
+            chart.setData(data);
         }
+
+        LineDataSet set = (LineDataSet) data.getDataSetByIndex(0);
+        if (set == null) {
+            set = createSet(chart == chartVoltage ? Color.parseColor("#FF5722") :
+                    (chart == chartCurrent ? Color.parseColor("#2196F3") : Color.parseColor("#4CAF50")));
+            data.addDataSet(set);
+        }
+
+        // 1. CALCULATE NEW X VALUE
+        float newX = 0;
+        if (set.getEntryCount() > 0) {
+            // New X = Last Entry's X + 1
+            Entry lastEntry = set.getEntryForIndex(set.getEntryCount() - 1);
+            newX = lastEntry.getX() + 1;
+        }
+
+        // 2. ADD VALUE
+        data.addEntry(new Entry(newX, value), 0);
+        data.notifyDataChanged();
+
+        // 3. REMOVE OLD
+        if (set.getEntryCount() > 50) {
+            set.removeFirst();
+        }
+
+        // 4. UPDATE VIEW
+        chart.notifyDataSetChanged();
+        chart.setVisibleXRangeMaximum(50);
+        chart.moveViewToX(newX);
     }
 
-    private LineDataSet createSet() {
-        LineDataSet set = new LineDataSet(null, "Voltage Data");
+    private void setupChart(LineChart chart, int color) {
+        chart.getDescription().setEnabled(false);
+        chart.setTouchEnabled(false);
+        chart.setDragEnabled(false);
+        chart.setScaleEnabled(false);
+        chart.setDrawGridBackground(false);
+        chart.setPinchZoom(false);
+        chart.setBackgroundColor(Color.WHITE);
+        chart.setViewPortOffsets(10, 0, 10, 0);
+
+        // X-Axis
+        XAxis xl = chart.getXAxis();
+        xl.setDrawGridLines(true);
+        xl.setGridColor(Color.parseColor("#E0E0E0"));
+        xl.setDrawAxisLine(false);
+        xl.setDrawLabels(false);
+
+        // Y-Axis
+        YAxis leftAxis = chart.getAxisLeft();
+        leftAxis.setDrawGridLines(false);
+        leftAxis.setDrawAxisLine(false);
+        leftAxis.setDrawLabels(false);
+        chart.getAxisRight().setEnabled(false);
+
+        // Initialize Empty Data
+        chart.setData(new LineData());
+    }
+
+    private LineDataSet createSet(int color) {
+        LineDataSet set = new LineDataSet(null, "Data");
         set.setAxisDependency(YAxis.AxisDependency.LEFT);
-        set.setColor(Color.parseColor("#0099CC")); // Blue Line
+        set.setColor(color);
         set.setLineWidth(2f);
-        set.setDrawCircles(false); // No dots for smooth line
-        set.setFillAlpha(65);
-        set.setFillColor(Color.parseColor("#0099CC"));
-        set.setHighLightColor(Color.rgb(244, 117, 117));
-        set.setValueTextColor(Color.BLACK);
-        set.setValueTextSize(9f);
-        set.setDrawValues(false); // Hide numbers on the line
+        set.setDrawCircles(false);
+        set.setDrawValues(false);
         return set;
-    }
-
-    // --- REMOVE THIS LATER: Just for testing ---
-    @Override
-    public void onResume() {
-        super.onResume();
-        startSimulation();
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (simulatorThread != null) simulatorThread.interrupt();
-    }
-
-    private void startSimulation() {
-        simulatorThread = new Thread(() -> {
-            while (!Thread.currentThread().isInterrupted()) {
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        // Generate random dummy number
-                        float val = (float) (Math.random() * 10) + 40;
-                        addEntry(val);
-                    });
-                }
-                try {
-                    Thread.sleep(100); // 100ms speed
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
-        });
-        simulatorThread.start();
     }
 }

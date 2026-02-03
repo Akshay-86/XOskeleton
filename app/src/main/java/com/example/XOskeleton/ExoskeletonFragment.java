@@ -58,6 +58,7 @@ public class ExoskeletonFragment extends Fragment {
     private double minClockOffset = Double.MAX_VALUE;
     private long pingStartTime = 0;
     private double lastCalculatedRTT = 0;
+    private ExoViewModel viewModel;
 
     @Nullable
     @Override
@@ -71,6 +72,8 @@ public class ExoskeletonFragment extends Fragment {
         statusText = view.findViewById(R.id.statusText);
         container = view.findViewById(R.id.container);
         btnChangeDevice = view.findViewById(R.id.btnChangeDevice);
+        // Initialize the Shared ViewModel
+        viewModel = new androidx.lifecycle.ViewModelProvider(requireActivity()).get(ExoViewModel.class);
 
         // Correctly find the View (matches the ID in your XML)
         btnReload = view.findViewById(R.id.btnReload);
@@ -329,13 +332,57 @@ public class ExoskeletonFragment extends Fragment {
 
     private void updateUi(JSONObject json) {
         try {
+            // 1. Existing Logic (Text Update)
             String timestamp = java.text.DateFormat.getTimeInstance().format(new Date());
             statusText.setText("Status: Active\nLast Update: " + timestamp);
-
-            // Render without re-parsing!
             JsonUiRenderer.render(requireContext(), json, container);
+
+            // 2. DEBUG LOG: See exactly what the app is receiving
+            // Log.d("EXO_DEBUG", "Received JSON: " + json.toString());
+
+            // 3. CORRECT LOGIC: Parse NESTED Data for Charts
+            if (viewModel != null) {
+
+                // --- A. VOLTAGE & CURRENT (Inside system -> battery) ---
+                JSONObject systemObj = json.optJSONObject("system");
+                if (systemObj != null) {
+                    JSONObject battObj = systemObj.optJSONObject("battery");
+                    if (battObj != null) {
+                        // Voltage
+                        double volts = battObj.optDouble("voltage", -1);
+                        if (volts != -1) {
+                            viewModel.voltage.setValue((float) volts);
+                            // Log.d("EXO_DEBUG", "Parsed Voltage: " + volts);
+                        }
+
+                        // Current
+                        double amps = battObj.optDouble("current", -1);
+                        if (amps != -1) {
+                            viewModel.current.setValue((float) amps);
+                            // Log.d("EXO_DEBUG", "Parsed Current: " + amps);
+                        }
+                    }
+                }
+
+                // --- B. SPEED (This might be motor RPM or IMU pitch?) ---
+                // Based on your JSON, you have "motors" -> "Left" -> "rpm"
+                // Let's use Left Motor RPM as "Speed" for now
+                JSONObject motorsObj = json.optJSONObject("motors");
+                if (motorsObj != null) {
+                    JSONObject leftMotor = motorsObj.optJSONObject("Left");
+                    if (leftMotor != null) {
+                        double rpm = leftMotor.optDouble("rpm", -1);
+                        if (rpm != -1) {
+                            // Scale RPM to something graphable if needed (e.g. /100)
+                            viewModel.speed.setValue((float) rpm);
+                            // Log.d("EXO_DEBUG", "Parsed Speed (RPM): " + rpm);
+                        }
+                    }
+                }
+            }
         } catch (Exception e) {
-            statusText.setText("UI Error");
+            Log.e("EXO_DEBUG", "Error parsing chart data", e);
+            statusText.setText("UI Error: " + e.getMessage());
         }
     }
 
