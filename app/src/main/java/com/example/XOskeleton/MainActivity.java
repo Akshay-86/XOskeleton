@@ -20,6 +20,8 @@ public class MainActivity extends AppCompatActivity {
     private Fragment fragment1; // Exo
     private Fragment fragment2; // Stats
     private Fragment fragment3; // Profile
+    private Fragment fragment4; // Dev
+
     private final FragmentManager fm = getSupportFragmentManager();
     private Fragment active;
 
@@ -45,7 +47,9 @@ public class MainActivity extends AppCompatActivity {
             fragment1 = new ExoskeletonFragment();
             fragment2 = new StatsFragment();
             fragment3 = new ProfileFragment();
+            fragment4 = new DevFragment();
 
+            fm.beginTransaction().add(R.id.fragment_container, fragment4, "4").hide(fragment4).commit();
             fm.beginTransaction().add(R.id.fragment_container, fragment3, "3").hide(fragment3).commit();
             fm.beginTransaction().add(R.id.fragment_container, fragment2, "2").hide(fragment2).commit();
             fm.beginTransaction().add(R.id.fragment_container, fragment1, "1").commit();
@@ -54,11 +58,13 @@ public class MainActivity extends AppCompatActivity {
             fragment1 = fm.findFragmentByTag("1");
             fragment2 = fm.findFragmentByTag("2");
             fragment3 = fm.findFragmentByTag("3");
+            fragment4 = fm.findFragmentByTag("4");
 
             // Restore active state
             if (fragment1 != null && !fragment1.isHidden()) active = fragment1;
             else if (fragment2 != null && !fragment2.isHidden()) active = fragment2;
             else if (fragment3 != null && !fragment3.isHidden()) active = fragment3;
+            else if (fragment4 != null && !fragment4.isHidden()) active = fragment4;
             else active = fragment1;
         }
 
@@ -76,6 +82,10 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_profile) {
                 fm.beginTransaction().hide(active).show(fragment3).commit();
                 active = fragment3;
+                return true;
+            } else if (itemId == R.id.nav_dev) {
+                fm.beginTransaction().hide(active).show(fragment4).commit();
+                active = fragment4;
                 return true;
             }
             return false;
