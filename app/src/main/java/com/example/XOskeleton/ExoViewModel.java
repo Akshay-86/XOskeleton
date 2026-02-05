@@ -5,31 +5,33 @@ import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.MutableLiveData;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 public class ExoViewModel extends AndroidViewModel {
 
-    // --- Live Data (UI watches these) ---
+    // --- 1. UI Live Data (General) ---
     public final MutableLiveData<String> statusMessage = new MutableLiveData<>();
     public final MutableLiveData<Boolean> isConnected = new MutableLiveData<>(false);
     public final MutableLiveData<JSONObject> liveDataPacket = new MutableLiveData<>();
 
-    // Chart Data
+    // --- 2. CHART DATA (Restored for StatsFragment) ---
     public final MutableLiveData<Float> voltage = new MutableLiveData<>();
     public final MutableLiveData<Float> current = new MutableLiveData<>();
     public final MutableLiveData<Float> speed = new MutableLiveData<>();
@@ -37,53 +39,37 @@ public class ExoViewModel extends AndroidViewModel {
     // --- Internals ---
     private BluetoothSocket socket;
     private volatile boolean isRunning = false;
-    private Thread connectionThread;
-
-    // Logging Tools
     private final DataLogger logger;
-    private final StringBuilder csvBuilder = new StringBuilder();
-    private final SimpleDateFormat csvTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
-    private final Date dateObject = new Date();
 
-    // Latency Metrics
-    private double minClockOffset = Double.MAX_VALUE;
-    private long pingStartTime = 0;
-    private double lastCalculatedRTT = 0;
+    // Dynamic Logging Variables
+    private List<String> csvHeaders = null;
+    private final StringBuilder csvBuilder = new StringBuilder();
 
     public ExoViewModel(@NonNull Application application) {
         super(application);
-        // Initialize Logger with Application Context
         logger = new DataLogger(application);
     }
-
-    // --- Connection Logic ---
 
     @SuppressLint("MissingPermission")
     public void connect(String macAddress) {
         if (isRunning || macAddress == null) return;
-
         statusMessage.setValue("Connecting...");
 
-        connectionThread = new Thread(() -> {
+        new Thread(() -> {
             try {
                 BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(macAddress);
-
-                // Try Port 1
                 Method m = device.getClass().getMethod("createRfcommSocket", int.class);
                 socket = (BluetoothSocket) m.invoke(device, 1);
 
                 if (socket != null) {
                     socket.connect();
-
-                    // Connected!
                     isRunning = true;
                     isConnected.postValue(true);
                     statusMessage.postValue("Connected!");
 
-                    // Reset Metrics
-                    minClockOffset = Double.MAX_VALUE;
-                    pingStartTime = 0;
-                    lastCalculatedRTT = 0;
+                    // Reset logging for new session
+                    csvHeaders = null;
+                    logger.createNewFile();
 
                     startReadingLoop();
                 }
@@ -91,106 +77,43 @@ public class ExoViewModel extends AndroidViewModel {
                 disconnect();
                 statusMessage.postValue("Connection Failed");
             }
-        });
-        connectionThread.start();
+        }).start();
     }
 
     public void disconnect() {
         isRunning = false;
-        try {
-            if (socket != null) socket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        try { if (socket != null) socket.close(); } catch (IOException e) { e.printStackTrace(); }
         isConnected.postValue(false);
         statusMessage.postValue("Disconnected");
     }
 
-    // --- The Main Data Loop ---
-
     private void startReadingLoop() {
         byte[] lengthHeader = new byte[2];
-        long sessionStartTime = System.currentTimeMillis();
-        long totalBytesReceived = 0;
-        long localPacketCount = 0;
-        int loopCounter = 0;
 
         try {
             InputStream inputStream = socket.getInputStream();
-            OutputStream outputStream = socket.getOutputStream();
-
             while (isRunning) {
-                // 1. Send Ping (Every ~20 packets)
-                loopCounter++;
-                if (loopCounter >= 20) {
-                    loopCounter = 0;
-                    if (pingStartTime == 0) {
-                        try {
-                            outputStream.write(1);
-                            outputStream.flush();
-                            pingStartTime = System.currentTimeMillis();
-                        } catch (IOException ignored) {}
-                    }
-                }
-
-                // 2. Read Header
+                // Read Header
                 if (readExactly(inputStream, lengthHeader, 2) == -1) break;
                 int payloadSize = ((lengthHeader[0] & 0xFF) << 8) | (lengthHeader[1] & 0xFF);
 
-                // 3. Read Payload
+                // Read Payload
                 byte[] payload = new byte[payloadSize];
                 if (readExactly(inputStream, payload, payloadSize) == -1) break;
 
-                // 4. Metrics & Logging
                 String jsonString = new String(payload, StandardCharsets.UTF_8);
-                localPacketCount++;
-                totalBytesReceived += (payloadSize + 2);
 
                 try {
                     JSONObject json = new JSONObject(jsonString);
 
-                    // Send to UI
+                    // A. Update General UI
                     liveDataPacket.postValue(json);
 
-                    // Update Charts
+                    // B. Update StatsFragment Charts (Restored Logic)
                     parseChartData(json);
 
-                    // --- LOGGING LOGIC ---
-                    long serverPacketId = json.optLong("packet_id", 0);
-                    double serverTimeSec = json.optDouble("ts", 0);
-                    double androidTimeSec = System.currentTimeMillis() / 1000.0;
-
-                    // Latency Calculation
-                    if (serverTimeSec > 0) {
-                        double currentDiff = androidTimeSec - serverTimeSec;
-                        if (currentDiff < minClockOffset) minClockOffset = currentDiff;
-                    }
-                    if (json.has("pong") && json.getBoolean("pong") && pingStartTime > 0) {
-                        lastCalculatedRTT = (double) (System.currentTimeMillis() - pingStartTime);
-                        pingStartTime = 0;
-                    }
-
-                    // Prepare CSV Data
-                    double elapsedSeconds = (androidTimeSec * 1000.0 - sessionStartTime) / 1000.0;
-                    double kbPerSec = (elapsedSeconds > 0) ? (totalBytesReceived / 1024.0) / elapsedSeconds : 0;
-                    double pps = (elapsedSeconds > 0) ? localPacketCount / elapsedSeconds : 0;
-                    double relativeLatencyMs = (serverTimeSec > 0) ? (androidTimeSec - serverTimeSec - minClockOffset) * 1000.0 : 0;
-
-                    dateObject.setTime(System.currentTimeMillis());
-
-                    // Build String (Efficiently)
-                    synchronized (csvBuilder) {
-                        csvBuilder.setLength(0);
-                        csvBuilder.append(serverPacketId).append(',')
-                                .append(csvTimeFormat.format(dateObject)).append(',')
-                                .append(payloadSize + 2).append(',')
-                                .append(String.format(Locale.US, "%.2f", kbPerSec)).append(',')
-                                .append(String.format(Locale.US, "%.2f", pps)).append(',')
-                                .append(String.format(Locale.US, "%.4f", relativeLatencyMs)).append(',')
-                                .append(String.format(Locale.US, "%.2f", lastCalculatedRTT));
-
-                        logger.save(csvBuilder.toString());
-                    }
+                    // C. Log to CSV (Dynamic Logic)
+                    logDynamicJson(json);
 
                 } catch (Exception ignored) {}
             }
@@ -198,6 +121,72 @@ public class ExoViewModel extends AndroidViewModel {
             statusMessage.postValue("Connection Lost");
         } finally {
             disconnect();
+        }
+    }
+
+    // --- Helper: Parsing for StatsFragment ---
+    private void parseChartData(JSONObject json) {
+        // 1. Voltage & Current (system -> battery)
+        JSONObject sys = json.optJSONObject("system");
+        if (sys != null) {
+            JSONObject batt = sys.optJSONObject("battery");
+            if (batt != null) {
+                voltage.postValue((float) batt.optDouble("voltage", 0));
+                current.postValue((float) batt.optDouble("current", 0));
+            }
+        }
+
+        // 2. Speed (Using Left Motor RPM as default)
+        JSONObject motors = json.optJSONObject("motors");
+        if (motors != null) {
+            // Try left, fallback to right, fallback to 0
+            JSONObject left = motors.optJSONObject("left"); // Note: keys might be lowercase depending on python
+            if (left == null) left = motors.optJSONObject("Left");
+
+            if (left != null) {
+                // Note: Python sends "var1" as RPM in your simplified script
+                // Adjust this key ("rpm" or "var1") based on your Python script
+                // Assuming "var1" is RPM based on your last Python request:
+                speed.postValue((float) left.optDouble("var1", 0));
+            }
+        }
+    }
+
+    // --- Helper: Dynamic Logging ---
+    private void logDynamicJson(JSONObject json) throws JSONException {
+        Map<String, String> flatMap = new HashMap<>();
+        flatten(json, "", flatMap);
+
+        if (csvHeaders == null) {
+            csvHeaders = new ArrayList<>(flatMap.keySet());
+            Collections.sort(csvHeaders);
+            logger.save(String.join(",", csvHeaders));
+        }
+
+        synchronized (csvBuilder) {
+            csvBuilder.setLength(0);
+            for (int i = 0; i < csvHeaders.size(); i++) {
+                String key = csvHeaders.get(i);
+                String value = flatMap.get(key);
+                csvBuilder.append(value != null ? value : "0");
+                if (i < csvHeaders.size() - 1) csvBuilder.append(",");
+            }
+            logger.save(csvBuilder.toString());
+        }
+    }
+
+    private void flatten(JSONObject json, String prefix, Map<String, String> out) throws JSONException {
+        Iterator<String> keys = json.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = json.get(key);
+            String newKey = prefix.isEmpty() ? key : prefix + "." + key;
+
+            if (value instanceof JSONObject) {
+                flatten((JSONObject) value, newKey, out);
+            } else {
+                out.put(newKey, String.valueOf(value));
+            }
         }
     }
 
@@ -209,29 +198,6 @@ public class ExoViewModel extends AndroidViewModel {
             bytesRead += result;
         }
         return bytesRead;
-    }
-
-    private void parseChartData(JSONObject json) {
-        // Safe parsing for your specific nested JSON structure
-
-        // Voltage & Current (system -> battery)
-        JSONObject sys = json.optJSONObject("system");
-        if (sys != null) {
-            JSONObject batt = sys.optJSONObject("battery");
-            if (batt != null) {
-                voltage.postValue((float) batt.optDouble("voltage", 0));
-                current.postValue((float) batt.optDouble("current", 0));
-            }
-        }
-
-        // Speed (motors -> Left -> rpm)
-        JSONObject motors = json.optJSONObject("motors");
-        if (motors != null) {
-            JSONObject left = motors.optJSONObject("Left");
-            if (left != null) {
-                speed.postValue((float) left.optDouble("rpm", 0));
-            }
-        }
     }
 
     @Override

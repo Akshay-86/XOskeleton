@@ -1,14 +1,101 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".DevFragment">
+    android:layout_marginTop="70dp"
+    android:background="@android:color/white"
+    android:padding="16dp">
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="@string/hello_blank_fragment" />
+    <LinearLayout
+        android:id="@+id/containerMotor"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#e2e2e2"
+        android:padding="4dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/toggleMode"
+        app:layout_constraintHorizontal_weight="1"
+        android:layout_marginEnd="8dp">
 
-</FrameLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Select Motor"
+            android:textSize="10sp"
+            android:textColor="#555"/>
+
+        <Spinner
+            android:id="@+id/spinnerMotor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <ToggleButton
+        android:id="@+id/toggleMode"
+        android:layout_width="80dp"
+        android:layout_height="0dp"
+        android:textOn="Live"
+        android:textOff="Offline"
+        android:background="#e2e2e2"
+        android:textColor="@color/black"
+        app:layout_constraintStart_toEndOf="@id/containerMotor"
+        app:layout_constraintEnd_toStartOf="@id/layoutFileSelector"
+        app:layout_constraintTop_toTopOf="@id/containerMotor"
+        app:layout_constraintBottom_toBottomOf="@id/containerMotor"
+        android:layout_marginEnd="8dp"/>
+
+    <LinearLayout
+        android:id="@+id/layoutFileSelector"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#e2e2e2"
+        android:padding="4dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toEndOf="@id/toggleMode"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintHorizontal_weight="1">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Select Log File"
+            android:textSize="10sp"
+            android:textColor="#555"/>
+
+        <Spinner
+            android:id="@+id/spinnerFile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerProperties"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="#F5F5F5"
+        android:padding="8dp"
+        app:layout_constraintTop_toBottomOf="@id/containerMotor"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/devChart"
+        app:layout_constraintVertical_weight="1.5"/>
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/devChart"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/recyclerProperties"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintVertical_weight="4"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
