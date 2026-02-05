@@ -113,9 +113,20 @@ public class ScanActivity extends AppCompatActivity {
     private void saveAndFinish(BluetoothDevice device) {
         // FIX: Use the helper here too
         if (!hasConnectPermission()) return;
+        String name;
 
-        String name = device.getName();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+            ) != PackageManager.PERMISSION_GRANTED) {
+                return; // permission missing — safely exit
+            }
+        }
+
+        name = device.getName();
         if (name == null) name = "Unknown Device";
+
 
         BluetoothPrefs.saveDevice(this, name, device.getAddress());
         finish();
