@@ -39,8 +39,8 @@
         android:id="@+id/toggleMode"
         android:layout_width="80dp"
         android:layout_height="0dp"
-        android:textOn="Live"
-        android:textOff="Offline"
+        android:textOn="🟢 Live"
+        android:textOff="🔴 Offline"
         android:background="#e2e2e2"
         android:textColor="@color/black"
         app:layout_constraintStart_toEndOf="@id/containerMotor"
@@ -88,6 +88,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/devChart"
         app:layout_constraintVertical_weight="1.5"/>
+
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/devChart"
         android:layout_width="0dp"

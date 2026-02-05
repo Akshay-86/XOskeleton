@@ -21,18 +21,23 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Legend;
+import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 
 public class DevFragment extends Fragment {
 
@@ -52,8 +57,9 @@ public class DevFragment extends Fragment {
     private final List<String> activeLeftPlots = new ArrayList<>();
     private final List<String> activeRightPlots = new ArrayList<>();
 
-    // FIX: Shared Global X-Axis Counter
-    private float globalX = 0f;
+    // TIME LOGIC
+    private long startTime = 0;
+    private float currentX = 0f;
 
     private final int[] COLORS = {
             Color.parseColor("#F44336"), Color.parseColor("#2196F3"),
@@ -116,8 +122,10 @@ public class DevFragment extends Fragment {
     private void processLivePacket(JSONObject json) {
         if (!isLive) return;
 
-        // 1. FIX: Increment Global X once per packet
-        globalX += 1.0f;
+        // 1. TIME CALCULATION
+        long now = System.currentTimeMillis();
+        if (startTime == 0) startTime = now;
+        currentX = (now - startTime) / 1000f;
 
         // A. Dynamic Discovery
         boolean listChanged = false;
@@ -173,24 +181,23 @@ public class DevFragment extends Fragment {
 
         ILineDataSet set = data.getDataSetByLabel(propertyName, false);
         if (set == null) {
-            set = createDataSet(propertyName, isLeft ? YAxis.AxisDependency.LEFT : YAxis.AxisDependency.RIGHT);
+            // REVERSED LOGIC HERE:
+            // If isLeft is true, we use AxisDependency.RIGHT
+            // If isRight is true (else), we use AxisDependency.LEFT
+            set = createDataSet(propertyName, isLeft ? YAxis.AxisDependency.RIGHT : YAxis.AxisDependency.LEFT);
             data.addDataSet(set);
         }
 
-        // FIX: Use globalX instead of set.getEntryCount()
-        data.addEntry(new Entry(globalX, (float) value), data.getIndexOfDataSet((LineDataSet) set));
+        data.addEntry(new Entry(currentX, (float) value), data.getIndexOfDataSet((LineDataSet) set));
 
-        // Remove old points to keep chart fast (buffer size 100)
         if (set.getEntryCount() > 100) {
             ((LineDataSet) set).removeFirst();
         }
 
         data.notifyDataChanged();
         chart.notifyDataSetChanged();
-
-        // FIX: Ensure view follows globalX
-        chart.setVisibleXRangeMaximum(50);
-        chart.moveViewToX(globalX);
+        chart.setVisibleXRangeMaximum(5f);
+        chart.moveViewToX(currentX);
     }
 
     private LineDataSet createDataSet(String label, YAxis.AxisDependency axis) {
@@ -205,6 +212,34 @@ public class DevFragment extends Fragment {
         set.setDrawCircles(false);
         colorIndex++;
         return set;
+    }
+
+    private void setupChart() {
+        chart.getDescription().setEnabled(false);
+        chart.setTouchEnabled(true);
+        chart.setDragEnabled(true);
+        chart.setScaleEnabled(true);
+        chart.setPinchZoom(true);
+        chart.setBackgroundColor(Color.WHITE);
+
+        XAxis xAxis = chart.getXAxis();
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+//        xAxis.setLabelRotationAngle(-45);
+        xAxis.setValueFormatter(new ValueFormatter() {
+            private final SimpleDateFormat mFormat = new SimpleDateFormat("h:mm:ss a", Locale.US);
+
+            @Override
+            public String getFormattedValue(float value) {
+                long originalTimestamp = startTime + (long)(value * 1000);
+                return mFormat.format(new Date(originalTimestamp));
+            }
+        });
+
+        YAxis left = chart.getAxisLeft();
+        left.setTextColor(Color.BLUE);
+        YAxis right = chart.getAxisRight();
+        right.setEnabled(true);
+        right.setTextColor(Color.RED);
     }
 
     private void showPlotMenu(View view, String propertyName) {
@@ -225,14 +260,16 @@ public class DevFragment extends Fragment {
                     if (!activeLeftPlots.contains(propertyName)) {
                         activeLeftPlots.add(propertyName);
                         activeRightPlots.remove(propertyName);
-                        refreshChartConfig(propertyName, YAxis.AxisDependency.LEFT);
+                        // REVERSED: Button says "Left", logic sets "RIGHT"
+                        refreshChartConfig(propertyName, YAxis.AxisDependency.RIGHT);
                     }
                     break;
                 case 2:
                     if (!activeRightPlots.contains(propertyName)) {
                         activeRightPlots.add(propertyName);
                         activeLeftPlots.remove(propertyName);
-                        refreshChartConfig(propertyName, YAxis.AxisDependency.RIGHT);
+                        // REVERSED: Button says "Right", logic sets "LEFT"
+                        refreshChartConfig(propertyName, YAxis.AxisDependency.LEFT);
                     }
                     break;
                 case 3:
@@ -272,32 +309,10 @@ public class DevFragment extends Fragment {
         activeLeftPlots.clear();
         activeRightPlots.clear();
         colorIndex = 0;
-        globalX = 0f; // Reset Global X too!
+        startTime = 0;
         if (chart.getData() != null) {
             chart.getData().clearValues();
             chart.clear();
         }
-    }
-
-    private void setupChart() {
-        chart.getDescription().setEnabled(false);
-        chart.setTouchEnabled(true);
-        chart.setDragEnabled(true);
-        chart.setScaleEnabled(true);
-        chart.setPinchZoom(true);
-        chart.setBackgroundColor(Color.WHITE);
-
-        Legend l = chart.getLegend();
-        l.setVerticalAlignment(Legend.LegendVerticalAlignment.BOTTOM);
-        l.setHorizontalAlignment(Legend.LegendHorizontalAlignment.LEFT);
-        l.setOrientation(Legend.LegendOrientation.HORIZONTAL);
-        l.setDrawInside(false);
-        l.setWordWrapEnabled(true);
-
-        YAxis left = chart.getAxisLeft();
-        left.setTextColor(Color.BLUE);
-        YAxis right = chart.getAxisRight();
-        right.setEnabled(true);
-        right.setTextColor(Color.RED);
     }
 }
