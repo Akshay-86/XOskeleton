@@ -51,6 +51,16 @@ public class DeviceDiscoveryManager { // Changed from 'public class DeviceDiscov
             Log.d(TAG, "BroadcastReceiver registered.");
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_SCAN
+            ) != PackageManager.PERMISSION_GRANTED) {
+
+                Log.w(TAG, "BLUETOOTH_SCAN permission not granted");
+                return;
+            }
+        }
         if (adapter.isDiscovering()) {
             adapter.cancelDiscovery();
             Log.d(TAG, "Cancelling ongoing discovery.");
