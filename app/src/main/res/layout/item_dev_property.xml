@@ -4,7 +4,7 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="12dp"
+    android:padding="8dp"
     android:background="?attr/selectableItemBackground">
 
     <TextView
@@ -12,17 +12,33 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Key"
+        android:text="Pitch"
         android:textStyle="bold"
-        android:textColor="@color/black"
-        android:textSize="16sp" />
+        android:textColor="?stringColor"
+        android:textSize="16sp"
+        android:gravity="start|center_vertical"/>
 
     <TextView
         android:id="@+id/value"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Value"
-        android:textColor="@color/black"
-        android:textSize="16sp"/>
+        android:layout_weight="1"
+        android:text="1.564689"
+        android:textColor="?stringColor"
+        android:textSize="16sp"
+        android:gravity="center"/>
+
+    <TextView
+        android:id="@+id/btnAction"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:text="+"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="?stringColor"
+        android:gravity="center"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"/>
 
 </LinearLayout>

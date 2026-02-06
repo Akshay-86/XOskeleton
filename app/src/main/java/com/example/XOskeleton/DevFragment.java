@@ -20,7 +20,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
@@ -84,7 +83,18 @@ public class DevFragment extends Fragment {
 
         RecyclerView recycler = view.findViewById(R.id.recyclerProperties);
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
-        adapter = new DevPropertyAdapter(this::showPlotMenu);
+
+        // --- NEW CLICK LOGIC ---
+        // The adapter now gives us 'isCurrentlyPlotted' so we know what to do
+        adapter = new DevPropertyAdapter((view1, propertyName, isCurrentlyPlotted) -> {
+            if (isCurrentlyPlotted) {
+                // If currently plotted (Minus button), remove it
+                removePlot(propertyName);
+            } else {
+                // If not plotted (Plus button), show Add Menu
+                showPlotMenu(view1, propertyName);
+            }
+        });
         recycler.setAdapter(adapter);
 
         spinnerMotor = view.findViewById(R.id.spinnerMotor);
@@ -163,7 +173,9 @@ public class DevFragment extends Fragment {
                     }
                 }
                 Collections.sort(props, (p1, p2) -> p1.name.compareTo(p2.name));
-                adapter.updateData(props);
+
+                // IMPORTANT: Pass current plot state to adapter so it shows +/- correctly
+                adapter.updateData(props, activeLeftPlots, activeRightPlots);
             }
         }
     }
@@ -181,9 +193,7 @@ public class DevFragment extends Fragment {
 
         ILineDataSet set = data.getDataSetByLabel(propertyName, false);
         if (set == null) {
-            // REVERSED LOGIC HERE:
-            // If isLeft is true, we use AxisDependency.RIGHT
-            // If isRight is true (else), we use AxisDependency.LEFT
+            // REVERSED AXIS LOGIC: Left Btn -> Right Axis
             set = createDataSet(propertyName, isLeft ? YAxis.AxisDependency.RIGHT : YAxis.AxisDependency.LEFT);
             data.addDataSet(set);
         }
@@ -224,7 +234,6 @@ public class DevFragment extends Fragment {
 
         XAxis xAxis = chart.getXAxis();
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-//        xAxis.setLabelRotationAngle(-45);
         xAxis.setValueFormatter(new ValueFormatter() {
             private final SimpleDateFormat mFormat = new SimpleDateFormat("h:mm:ss a", Locale.US);
 
@@ -242,40 +251,36 @@ public class DevFragment extends Fragment {
         right.setTextColor(Color.RED);
     }
 
+    // --- NEW HELPER: Remove Plot Immediately ---
+    private void removePlot(String propertyName) {
+        activeLeftPlots.remove(propertyName);
+        activeRightPlots.remove(propertyName);
+        removeDataSet(propertyName);
+    }
+
+    // --- UPDATED MENU: Only shows "Add" options ---
     private void showPlotMenu(View view, String propertyName) {
         PopupMenu popup = new PopupMenu(requireContext(), view);
-        MenuItem itemLeft = popup.getMenu().add(0, 1, 0, "Plot Left Axis");
-        MenuItem itemRight = popup.getMenu().add(0, 2, 0, "Plot Right Axis");
-        MenuItem itemClear = popup.getMenu().add(0, 3, 0, "Clear / Remove");
-
-        if (activeLeftPlots.contains(propertyName)) itemLeft.setEnabled(false);
-        if (activeRightPlots.contains(propertyName)) itemRight.setEnabled(false);
-        if (!activeLeftPlots.contains(propertyName) && !activeRightPlots.contains(propertyName)) {
-            itemClear.setEnabled(false);
-        }
+        popup.getMenu().add(0, 1, 0, "Plot Left Axis");
+        popup.getMenu().add(0, 2, 0, "Plot Right Axis");
 
         popup.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
-                case 1:
+                case 1: // Plot Left
                     if (!activeLeftPlots.contains(propertyName)) {
                         activeLeftPlots.add(propertyName);
                         activeRightPlots.remove(propertyName);
-                        // REVERSED: Button says "Left", logic sets "RIGHT"
+                        // Reversed Axis Logic
                         refreshChartConfig(propertyName, YAxis.AxisDependency.RIGHT);
                     }
                     break;
-                case 2:
+                case 2: // Plot Right
                     if (!activeRightPlots.contains(propertyName)) {
                         activeRightPlots.add(propertyName);
                         activeLeftPlots.remove(propertyName);
-                        // REVERSED: Button says "Right", logic sets "LEFT"
+                        // Reversed Axis Logic
                         refreshChartConfig(propertyName, YAxis.AxisDependency.LEFT);
                     }
-                    break;
-                case 3:
-                    activeLeftPlots.remove(propertyName);
-                    activeRightPlots.remove(propertyName);
-                    removeDataSet(propertyName);
                     break;
             }
             return true;

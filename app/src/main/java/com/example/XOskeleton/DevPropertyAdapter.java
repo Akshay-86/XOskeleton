@@ -7,7 +7,9 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class DevPropertyAdapter extends RecyclerView.Adapter<DevPropertyAdapter.ViewHolder> {
 
@@ -18,17 +20,25 @@ public class DevPropertyAdapter extends RecyclerView.Adapter<DevPropertyAdapter.
     }
 
     private final List<PropertyItem> items = new ArrayList<>();
-    private final OnItemLongClickListener longClickListener;
+    private final Set<String> activeKeys = new HashSet<>(); // Tracks what is currently plotted
+    private final OnItemActionListener actionListener;
 
-    public interface OnItemLongClickListener {
-        void onLongClick(View view, String propertyName);
+    public interface OnItemActionListener {
+        void onActionClick(View view, String propertyName, boolean isCurrentlyPlotted);
     }
 
-    public DevPropertyAdapter(OnItemLongClickListener listener) {
-        this.longClickListener = listener;
+    public DevPropertyAdapter(OnItemActionListener listener) {
+        this.actionListener = listener;
     }
 
-    public void updateData(List<PropertyItem> newItems) {
+    // Updated to accept the list of active plots
+    public void updateData(List<PropertyItem> newItems, List<String> plottedLeft, List<String> plottedRight) {
+        // Update Active Keys Set for fast lookup
+        activeKeys.clear();
+        if (plottedLeft != null) activeKeys.addAll(plottedLeft);
+        if (plottedRight != null) activeKeys.addAll(plottedRight);
+
+        // Standard List Update Logic
         if (items.size() != newItems.size()) {
             items.clear();
             items.addAll(newItems);
@@ -40,11 +50,18 @@ public class DevPropertyAdapter extends RecyclerView.Adapter<DevPropertyAdapter.
             PropertyItem oldItem = items.get(i);
             PropertyItem newItem = newItems.get(i);
 
-            // FIX: Check for difference BEFORE updating the value!
-            // Previously we updated first, so they were always "equal"
-            if (!oldItem.value.equals(newItem.value)) {
-                oldItem.value = newItem.value; // Update local data
-                notifyItemChanged(i, "UPDATE_TEXT_ONLY"); // Update UI
+            // Check if plot state changed for this item (e.g., user just clicked plot)
+            boolean wasPlotted = activeKeys.contains(oldItem.name);
+            boolean isPlotted = activeKeys.contains(newItem.name);
+
+            // Check if value changed
+            boolean valueChanged = !oldItem.value.equals(newItem.value);
+
+            oldItem.value = newItem.value; // Sync data
+
+            if (valueChanged || wasPlotted != isPlotted) {
+                // Refresh row if Text changed OR Plot State changed
+                notifyItemChanged(i, "UPDATE_content");
             }
         }
     }
@@ -58,37 +75,50 @@ public class DevPropertyAdapter extends RecyclerView.Adapter<DevPropertyAdapter.
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        PropertyItem item = items.get(position);
-        holder.textKey.setText(item.name);
-        holder.textValue.setText(item.value);
-        holder.itemView.setOnLongClickListener(v -> {
-            longClickListener.onLongClick(v, item.name);
-            return true;
-        });
+        bind(holder, position);
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position, @NonNull List<Object> payloads) {
         if (!payloads.isEmpty()) {
-            for (Object payload : payloads) {
-                if (payload.equals("UPDATE_TEXT_ONLY")) {
-                    holder.textValue.setText(items.get(position).value);
-                }
-            }
+            bind(holder, position); // Just re-bind logic, it's cheap
         } else {
             super.onBindViewHolder(holder, position, payloads);
         }
+    }
+
+    private void bind(ViewHolder holder, int position) {
+        PropertyItem item = items.get(position);
+        boolean isPlotted = activeKeys.contains(item.name);
+
+        holder.textKey.setText(item.name);
+        holder.textValue.setText(item.value);
+
+        // Toggle Icon based on state
+        if (isPlotted) {
+            holder.btnAction.setText("-");
+            holder.btnAction.setTextColor(0xFFFF0000); // Red for remove
+        } else {
+            holder.btnAction.setText("+");
+            holder.btnAction.setTextColor(0xFF000000); // Black for add
+        }
+
+        // Click Listener for the BUTTON only
+        holder.btnAction.setOnClickListener(v -> {
+            actionListener.onActionClick(v, item.name, isPlotted);
+        });
     }
 
     @Override
     public int getItemCount() { return items.size(); }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView textKey, textValue;
+        TextView textKey, textValue, btnAction;
         ViewHolder(View v) {
             super(v);
             textKey = v.findViewById(R.id.key);
             textValue = v.findViewById(R.id.value);
+            btnAction = v.findViewById(R.id.btnAction);
         }
     }
 }
