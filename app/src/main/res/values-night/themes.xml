@@ -2,6 +2,9 @@
     <!-- Base application theme. -->
     <style name="Base.Theme.BasicBluetoothApp" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your dark theme here. -->
+        <item name="appBackground">@color/black</item>
+        <item name="viewBackground">@color/light_secondary</item>
+        <item name="stringColor">@color/light_primary</item>
         <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
     </style>
 </resources>

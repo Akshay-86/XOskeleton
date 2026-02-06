@@ -1,0 +1,6 @@
+<resources>
+    <attr name="appBackground" format="color|reference"/>
+    <attr name="customBg" format="color|reference"/>
+    <attr name="viewBackground" format="color|reference"/>
+    <attr name="stringColor" format="color|reference"/>
+</resources>

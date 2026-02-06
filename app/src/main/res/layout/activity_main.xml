@@ -11,7 +11,7 @@
         android:id="@+id/my_toolbar"
         android:layout_width="match_parent"
         android:layout_height="64dp"
-        android:background="?attr/colorPrimary"
+        android:background="?attr/viewBackground"
         android:elevation="4dp"
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
         app:layout_constraintStart_toStartOf="parent"
@@ -65,7 +65,7 @@
                 android:textSize="16sp"
                 android:text="Unknown Device"
                 android:textStyle="bold"
-                android:textColor="@color/light_secondary"
+                android:textColor="?stringColor"
                 android:layout_height="wrap_content" />
 
             <TextView
@@ -73,7 +73,7 @@
                 android:layout_width="wrap_content"
                 android:textSize="12sp"
                 android:text="AA:BB:CC:DD:EE:FF"
-                android:textColor="@color/light_secondary_60"
+                android:textColor="?stringColor"
                 android:layout_height="wrap_content" />
 
         </LinearLayout>
@@ -121,8 +121,9 @@
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/white"
+        android:background="?viewBackground"
         app:menu="@menu/bottom_nav_menu"
+        app:itemTextColor="?stringColor"
         app:itemRippleColor="@color/light_primary_10"
         app:itemActiveIndicatorStyle="@style/App.Custom.Indicator"
         app:itemTextAppearanceActive="@style/BottomNavTextActive"

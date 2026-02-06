@@ -6,7 +6,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_marginTop="70dp"
-    android:background="@android:color/white"
     android:padding="16dp">
 
     <LinearLayout
@@ -27,7 +26,7 @@
             android:layout_height="wrap_content"
             android:text="Select Motor"
             android:textSize="10sp"
-            android:textColor="#555"/>
+            android:textColor="?stringColor"/>
 
         <Spinner
             android:id="@+id/spinnerMotor"
@@ -42,7 +41,7 @@
         android:textOn="🟢 Live"
         android:textOff="🔴 Offline"
         android:background="#e2e2e2"
-        android:textColor="@color/black"
+        android:textColor="?stringColor"
         app:layout_constraintStart_toEndOf="@id/containerMotor"
         app:layout_constraintEnd_toStartOf="@id/layoutFileSelector"
         app:layout_constraintTop_toTopOf="@id/containerMotor"
@@ -67,7 +66,7 @@
             android:layout_height="wrap_content"
             android:text="Select Log File"
             android:textSize="10sp"
-            android:textColor="#555"/>
+            android:textColor="?stringColor"/>
 
         <Spinner
             android:id="@+id/spinnerFile"

@@ -2,11 +2,12 @@
     <!-- Base application theme. -->
     <style name="Base.Theme.BasicBluetoothApp" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
-        <item name="colorPrimary">@color/light_primary</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="colorPrimaryVariant">@color/light_primary</item>
+        <item name="appBackground">@color/white</item>
+        <item name="viewBackground">@color/light_primary</item>
+        <item name="stringColor">@color/light_secondary</item>
         <!-- Status bar color. -->
-        <item name="android:statusBarColor">@color/light_primary</item>
+        <item name="android:statusBarColor">?viewBackground</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:windowTranslucentStatus">false</item>
@@ -15,7 +16,7 @@
     </style>
 
     <style name="App.Custom.Indicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
-        <item name="android:color">@color/light_primary_40</item>
+        <item name="android:color">?viewBackground</item>
     </style>
     <style name="RoundedCornersImageView" parent="">
         <item name="cornerFamily">rounded</item>

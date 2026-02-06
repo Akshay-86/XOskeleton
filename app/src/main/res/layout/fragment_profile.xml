@@ -25,10 +25,9 @@
                     android:layout_height="120dp"
                     app:cardCornerRadius="60dp"
                     app:cardElevation="0dp"
-                    app:strokeColor="#000000"
+                    app:strokeColor="?stringColor"
                     app:strokeWidth="2dp"
-                    android:layout_marginTop="32dp"
-                    app:cardBackgroundColor="@android:color/white">
+                    android:layout_marginTop="32dp">
 
                     <ImageView
                         android:layout_width="match_parent"
@@ -43,7 +42,7 @@
                     android:layout_height="wrap_content"
                     android:text="Akshay Kumar"
                     android:textSize="20sp"
-                    android:textColor="@color/black"
+                    android:textColor="?stringColor"
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="32dp"/>
 
@@ -55,7 +54,6 @@
                     app:cardElevation="0dp"
                     app:strokeColor="#0B3041"
                     app:strokeWidth="2dp"
-                    app:cardBackgroundColor="@android:color/white"
                     android:layout_marginBottom="24dp">
 
                     <LinearLayout
@@ -95,8 +93,7 @@
                     app:cardCornerRadius="24dp"
                     app:cardElevation="0dp"
                     app:strokeColor="#0B3041"
-                    app:strokeWidth="2dp"
-                    app:cardBackgroundColor="@android:color/white">
+                    app:strokeWidth="2dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
