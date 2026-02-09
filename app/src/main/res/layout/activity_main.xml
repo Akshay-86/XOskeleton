@@ -22,11 +22,11 @@
 
         <!-- LEFT -->
         <ImageView
-            android:layout_width="50dp"
-            android:layout_height="50dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:id="@+id/logo_header"
             android:layout_gravity="start|center_vertical"
-            android:src="@drawable/logo1" />
+            android:src="@drawable/logo" />
 
         <!-- RIGHT -->
         <LinearLayout
@@ -124,7 +124,7 @@
         android:background="?viewBackground"
         app:menu="@menu/bottom_nav_menu"
         app:itemTextColor="?stringColor"
-        app:itemRippleColor="@color/light_primary_10"
+        app:itemRippleColor="@color/light_primary_20"
         app:itemActiveIndicatorStyle="@style/App.Custom.Indicator"
         app:itemTextAppearanceActive="@style/BottomNavTextActive"
         app:itemTextAppearanceInactive="@style/BottomNavTextInactive"

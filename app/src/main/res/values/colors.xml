@@ -5,7 +5,7 @@
     <color name="white">#FFFFFFFF</color>
     <color name="light_primary">#fd9a24</color>
     <color name="light_primary_40">#66FD9A24</color>
-    <color name="light_primary_10">#1AFF8A00</color>
+    <color name="light_primary_20">#33FF8A00</color>
     <color name="light_secondary">#00302c</color>
     <color name="light_secondary_30">#4C00302C</color>
     <color name="light_secondary_60">#9A00302C</color>

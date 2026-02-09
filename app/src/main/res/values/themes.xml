@@ -3,7 +3,7 @@
     <style name="Base.Theme.BasicBluetoothApp" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
         <item name="appBackground">@color/white</item>
-        <item name="viewBackground">@color/light_primary</item>
+        <item name="viewBackground">@color/light_primary_40</item>
         <item name="stringColor">@color/light_secondary</item>
         <!-- Status bar color. -->
         <item name="android:statusBarColor">?viewBackground</item>

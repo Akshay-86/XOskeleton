@@ -5,7 +5,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
-    android:background="@color/white"
     android:padding="16dp">
 
     <TextView
@@ -35,6 +34,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="Scan for Devices"
+        android:textColor="?stringColor"
         android:backgroundTint="?viewBackground"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"

@@ -61,9 +61,11 @@ public class DevFragment extends Fragment {
     private float currentX = 0f;
 
     private final int[] COLORS = {
-            Color.parseColor("#F44336"), Color.parseColor("#2196F3"),
-            Color.parseColor("#4CAF50"), Color.parseColor("#FFC107"),
-            Color.parseColor("#9C27B0")
+            Color.parseColor("#F44336"), // Red
+            Color.parseColor("#2196F3"), // Blue
+            Color.parseColor("#4CAF50"), // Green
+            Color.parseColor("#FFC107"), // Amber
+            Color.parseColor("#9C27B0")  // Purple
     };
     private int colorIndex = 0;
 
@@ -84,14 +86,10 @@ public class DevFragment extends Fragment {
         RecyclerView recycler = view.findViewById(R.id.recyclerProperties);
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
 
-        // --- NEW CLICK LOGIC ---
-        // The adapter now gives us 'isCurrentlyPlotted' so we know what to do
         adapter = new DevPropertyAdapter((view1, propertyName, isCurrentlyPlotted) -> {
             if (isCurrentlyPlotted) {
-                // If currently plotted (Minus button), remove it
                 removePlot(propertyName);
             } else {
-                // If not plotted (Plus button), show Add Menu
                 showPlotMenu(view1, propertyName);
             }
         });
@@ -132,7 +130,7 @@ public class DevFragment extends Fragment {
     private void processLivePacket(JSONObject json) {
         if (!isLive) return;
 
-        // 1. TIME CALCULATION
+        // 1. Time Logic
         long now = System.currentTimeMillis();
         if (startTime == 0) startTime = now;
         currentX = (now - startTime) / 1000f;
@@ -156,7 +154,7 @@ public class DevFragment extends Fragment {
             }
         }
 
-        // B. Property Extraction & Plotting
+        // B. Plotting
         if (selectedMotorKey != null) {
             JSONObject motorData = json.optJSONObject(selectedMotorKey);
             if (motorData != null) {
@@ -172,9 +170,7 @@ public class DevFragment extends Fragment {
                         updateChartData(key, doubleVal);
                     }
                 }
-                Collections.sort(props, (p1, p2) -> p1.name.compareTo(p2.name));
-
-                // IMPORTANT: Pass current plot state to adapter so it shows +/- correctly
+                props.sort((p1, p2) -> p1.name.compareTo(p2.name));
                 adapter.updateData(props, activeLeftPlots, activeRightPlots);
             }
         }
@@ -193,9 +189,16 @@ public class DevFragment extends Fragment {
 
         ILineDataSet set = data.getDataSetByLabel(propertyName, false);
         if (set == null) {
-            // REVERSED AXIS LOGIC: Left Btn -> Right Axis
-            set = createDataSet(propertyName, isLeft ? YAxis.AxisDependency.RIGHT : YAxis.AxisDependency.LEFT);
+            set = createDataSet(propertyName, isLeft ? YAxis.AxisDependency.LEFT : YAxis.AxisDependency.RIGHT);
             data.addDataSet(set);
+        }
+
+        // --- NEW: SYNC AXIS COLOR ---
+        // Whenever we update a line, we force the axis to match its color
+        if (isLeft) {
+            chart.getAxisLeft().setTextColor(set.getColor());
+        } else {
+            chart.getAxisRight().setTextColor(set.getColor());
         }
 
         data.addEntry(new Entry(currentX, (float) value), data.getIndexOfDataSet((LineDataSet) set));
@@ -236,7 +239,6 @@ public class DevFragment extends Fragment {
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
         xAxis.setValueFormatter(new ValueFormatter() {
             private final SimpleDateFormat mFormat = new SimpleDateFormat("h:mm:ss a", Locale.US);
-
             @Override
             public String getFormattedValue(float value) {
                 long originalTimestamp = startTime + (long)(value * 1000);
@@ -244,21 +246,20 @@ public class DevFragment extends Fragment {
             }
         });
 
+        // Initialize Axes (Gray by default)
         YAxis left = chart.getAxisLeft();
-        left.setTextColor(Color.BLUE);
+        left.setTextColor(Color.DKGRAY);
         YAxis right = chart.getAxisRight();
         right.setEnabled(true);
-        right.setTextColor(Color.RED);
+        right.setTextColor(Color.DKGRAY);
     }
 
-    // --- NEW HELPER: Remove Plot Immediately ---
     private void removePlot(String propertyName) {
         activeLeftPlots.remove(propertyName);
         activeRightPlots.remove(propertyName);
         removeDataSet(propertyName);
     }
 
-    // --- UPDATED MENU: Only shows "Add" options ---
     private void showPlotMenu(View view, String propertyName) {
         PopupMenu popup = new PopupMenu(requireContext(), view);
         popup.getMenu().add(0, 1, 0, "Plot Left Axis");
@@ -270,16 +271,14 @@ public class DevFragment extends Fragment {
                     if (!activeLeftPlots.contains(propertyName)) {
                         activeLeftPlots.add(propertyName);
                         activeRightPlots.remove(propertyName);
-                        // Reversed Axis Logic
-                        refreshChartConfig(propertyName, YAxis.AxisDependency.RIGHT);
+                        refreshChartConfig(propertyName, YAxis.AxisDependency.LEFT);
                     }
                     break;
                 case 2: // Plot Right
                     if (!activeRightPlots.contains(propertyName)) {
                         activeRightPlots.add(propertyName);
                         activeLeftPlots.remove(propertyName);
-                        // Reversed Axis Logic
-                        refreshChartConfig(propertyName, YAxis.AxisDependency.LEFT);
+                        refreshChartConfig(propertyName, YAxis.AxisDependency.RIGHT);
                     }
                     break;
             }
@@ -293,6 +292,14 @@ public class DevFragment extends Fragment {
             LineDataSet set = (LineDataSet) chart.getData().getDataSetByLabel(label, false);
             if (set != null) {
                 set.setAxisDependency(axis);
+
+                // --- NEW: SYNC AXIS COLOR ON SWITCH ---
+                if (axis == YAxis.AxisDependency.LEFT) {
+                    chart.getAxisLeft().setTextColor(set.getColor());
+                } else {
+                    chart.getAxisRight().setTextColor(set.getColor());
+                }
+
                 chart.notifyDataSetChanged();
                 chart.invalidate();
             }
@@ -319,5 +326,8 @@ public class DevFragment extends Fragment {
             chart.getData().clearValues();
             chart.clear();
         }
+        // Reset Axes to Neutral Gray
+        chart.getAxisLeft().setTextColor(Color.DKGRAY);
+        chart.getAxisRight().setTextColor(Color.DKGRAY);
     }
 }

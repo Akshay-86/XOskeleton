@@ -1,6 +1,7 @@
 package com.example.XOskeleton;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -141,6 +142,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @SuppressLint("DetachAndAttachSameFragment")
     private void setupHeaderActions() {
         btnStop.setOnClickListener(v -> {
             BluetoothPrefs.clearDevice(this);
