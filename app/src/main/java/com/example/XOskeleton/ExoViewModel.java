@@ -10,6 +10,8 @@ import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.MutableLiveData;
 
+import com.github.mikephil.charting.data.Entry; // Import for Chart Entry
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -49,6 +51,10 @@ public class ExoViewModel extends AndroidViewModel {
         super(application);
         logger = new DataLogger(application);
     }
+
+    // ==========================================
+    //           BLUETOOTH CONNECTION
+    // ==========================================
 
     @SuppressLint("MissingPermission")
     public void connect(String macAddress) {
@@ -109,10 +115,10 @@ public class ExoViewModel extends AndroidViewModel {
                     // A. Update General UI
                     liveDataPacket.postValue(json);
 
-                    // B. Update StatsFragment Charts (Restored Logic)
+                    // B. Update StatsFragment Charts
                     parseChartData(json);
 
-                    // C. Log to CSV (Dynamic Logic)
+                    // C. Log to CSV
                     logDynamicJson(json);
 
                 } catch (Exception ignored) {}
@@ -124,9 +130,80 @@ public class ExoViewModel extends AndroidViewModel {
         }
     }
 
-    // --- Helper: Parsing for StatsFragment ---
+    // ==========================================
+    //           OFFLINE FILE HANDLING
+    // ==========================================
+
+    // 1. Get list of available CSV files
+    public List<String> getLogFiles() {
+        return logger.getAllFiles();
+    }
+
+    // 2. Get just the headers (First row) to populate the "Properties" list
+    public List<String> getCsvHeaders(String fileName) {
+        // Read the file using DataLogger (reads all lines)
+        List<String[]> lines = logger.readFile(fileName);
+        if (!lines.isEmpty()) {
+            String[] headerRow = lines.get(0);
+            List<String> headers = new ArrayList<>();
+            Collections.addAll(headers, headerRow);
+            return headers;
+        }
+        return new ArrayList<>();
+    }
+
+    // 3. Extract a specific column for plotting
+    // Returns a list of (X,Y) entries for the graph
+    public List<Entry> getColumnData(String fileName, String columnName) {
+        List<Entry> entries = new ArrayList<>();
+        List<String[]> lines = logger.readFile(fileName);
+
+        if (lines.size() < 2) return entries; // Empty or just header
+
+        String[] headers = lines.get(0);
+        int colIndex = -1;
+        int timeIndex = -1;
+
+        // Find indices for the requested column AND the timestamp
+        for (int i = 0; i < headers.length; i++) {
+            if (headers[i].equals(columnName)) colIndex = i;
+            if (headers[i].contains("timestamp") || headers[i].contains("ts")) timeIndex = i;
+        }
+
+        if (colIndex == -1) return entries; // Column not found
+
+        // Parse rows
+        long startTime = 0;
+        for (int i = 1; i < lines.size(); i++) {
+            String[] row = lines.get(i);
+            // Ensure row is valid and has data for our column
+            if (row.length <= colIndex) continue;
+
+            try {
+                // Parse Y Value
+                float y = Float.parseFloat(row[colIndex]);
+
+                // Parse X Value (Time)
+                float x = i; // Default to row index
+                if (timeIndex != -1 && row.length > timeIndex) {
+                    float ts = Float.parseFloat(row[timeIndex]);
+                    if (startTime == 0) startTime = (long) ts; // First row sets the start time
+                    x = ts - startTime; // Normalize (Start at 0 seconds)
+                }
+
+                entries.add(new Entry(x, y));
+            } catch (NumberFormatException ignored) {
+                // Skip rows with bad data
+            }
+        }
+        return entries;
+    }
+
+    // ==========================================
+    //             INTERNAL HELPERS
+    // ==========================================
+
     private void parseChartData(JSONObject json) {
-        // 1. Voltage & Current (system -> battery)
         JSONObject sys = json.optJSONObject("system");
         if (sys != null) {
             JSONObject batt = sys.optJSONObject("battery");
@@ -136,23 +213,18 @@ public class ExoViewModel extends AndroidViewModel {
             }
         }
 
-        // 2. Speed (Using Left Motor RPM as default)
         JSONObject motors = json.optJSONObject("motors");
         if (motors != null) {
-            // Try left, fallback to right, fallback to 0
-            JSONObject left = motors.optJSONObject("left"); // Note: keys might be lowercase depending on python
+            JSONObject left = motors.optJSONObject("left");
             if (left == null) left = motors.optJSONObject("Left");
 
             if (left != null) {
-                // Note: Python sends "var1" as RPM in your simplified script
-                // Adjust this key ("rpm" or "var1") based on your Python script
-                // Assuming "var1" is RPM based on your last Python request:
+                // Assuming "var1" is RPM based on your standard packet
                 speed.postValue((float) left.optDouble("var1", 0));
             }
         }
     }
 
-    // --- Helper: Dynamic Logging ---
     private void logDynamicJson(JSONObject json) throws JSONException {
         Map<String, String> flatMap = new HashMap<>();
         flatten(json, "", flatMap);

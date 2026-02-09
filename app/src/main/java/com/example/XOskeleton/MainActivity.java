@@ -73,8 +73,11 @@ public class MainActivity extends AppCompatActivity {
 
             // Restore active state logic could be improved, but relying on "active" var is tricky across restarts
             // For now, defaulting to fragment1 if lost is safe
-            if (active == null) active = fragment1;
-        }
+            if (fragment1 != null && !fragment1.isHidden()) active = fragment1;
+            else if (fragment2 != null && !fragment2.isHidden()) active = fragment2;
+            else if (fragment3 != null && !fragment3.isHidden()) active = fragment3;
+            else if (fragment4 != null && !fragment4.isHidden()) active = fragment4;
+            else active = fragment1;        }
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
         bottomNav.setOnItemSelectedListener(item -> {
