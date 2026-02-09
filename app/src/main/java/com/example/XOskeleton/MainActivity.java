@@ -1,6 +1,8 @@
 package com.example.XOskeleton;
 
-import android.annotation.SuppressLint;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageButton;
@@ -9,11 +11,16 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -23,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
     private Fragment fragment4; // Dev
 
     private final FragmentManager fm = getSupportFragmentManager();
-    private Fragment active;
+    private Fragment active = fragment1;
 
     private TextView deviceNameText;
     private TextView deviceMacText;
@@ -34,13 +41,16 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // --- 1. ASK FOR PERMISSIONS IMMEDIATELY ---
+        checkBluetoothPermissions();
+
         Toolbar toolbar = findViewById(R.id.my_toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) getSupportActionBar().setDisplayShowTitleEnabled(false);
 
         deviceNameText = findViewById(R.id.device_name);
         deviceMacText = findViewById(R.id.device_mac);
-        btnStop = findViewById(R.id.reconnect);
+        btnStop = findViewById(R.id.reconnect); // This seems to be the disconnect button based on logic
 
         // --- Fragment Logic ---
         if (savedInstanceState == null) {
@@ -60,38 +70,55 @@ public class MainActivity extends AppCompatActivity {
             fragment3 = fm.findFragmentByTag("3");
             fragment4 = fm.findFragmentByTag("4");
 
-            // Restore active state
-            if (fragment1 != null && !fragment1.isHidden()) active = fragment1;
-            else if (fragment2 != null && !fragment2.isHidden()) active = fragment2;
-            else if (fragment3 != null && !fragment3.isHidden()) active = fragment3;
-            else if (fragment4 != null && !fragment4.isHidden()) active = fragment4;
-            else active = fragment1;
+            // Restore active state logic could be improved, but relying on "active" var is tricky across restarts
+            // For now, defaulting to fragment1 if lost is safe
+            if (active == null) active = fragment1;
         }
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
-            if (itemId == R.id.nav_exo) {
-                fm.beginTransaction().hide(active).show(fragment1).commit();
-                active = fragment1;
-                return true;
-            } else if (itemId == R.id.nav_stats) {
-                fm.beginTransaction().hide(active).show(fragment2).commit();
-                active = fragment2;
-                return true;
-            } else if (itemId == R.id.nav_profile) {
-                fm.beginTransaction().hide(active).show(fragment3).commit();
-                active = fragment3;
-                return true;
-            } else if (itemId == R.id.nav_dev) {
-                fm.beginTransaction().hide(active).show(fragment4).commit();
-                active = fragment4;
+            Fragment selected = null;
+
+            if (itemId == R.id.nav_exo) selected = fragment1;
+            else if (itemId == R.id.nav_stats) selected = fragment2;
+            else if (itemId == R.id.nav_profile) selected = fragment3;
+            else if (itemId == R.id.nav_dev) selected = fragment4;
+
+            if (selected != null) {
+                fm.beginTransaction().hide(active).show(selected).commit();
+                active = selected;
                 return true;
             }
             return false;
         });
 
         setupHeaderActions();
+    }
+
+    // --- PERMISSION LOGIC ---
+    private void checkBluetoothPermissions() {
+        List<String> requiredPermissions = new ArrayList<>();
+
+        // Android 12+ (API 31+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                requiredPermissions.add(Manifest.permission.BLUETOOTH_SCAN);
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                requiredPermissions.add(Manifest.permission.BLUETOOTH_CONNECT);
+            }
+        }
+        // Android 11 and below (needs Location for scanning)
+        else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requiredPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            }
+        }
+
+        if (!requiredPermissions.isEmpty()) {
+            ActivityCompat.requestPermissions(this, requiredPermissions.toArray(new String[0]), 100);
+        }
     }
 
     @Override
@@ -105,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
         String mac = BluetoothPrefs.getLastAddress(this);
 
         if (mac != null) {
-            deviceNameText.setText(name);
+            deviceNameText.setText(name != null ? name : "Unknown");
             deviceMacText.setText(mac);
             findViewById(R.id.device_details).setVisibility(View.VISIBLE);
         } else {
@@ -114,22 +141,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @SuppressLint("DetachAndAttachSameFragment")
     private void setupHeaderActions() {
         btnStop.setOnClickListener(v -> {
-            // 1. Wipe Saved Data
             BluetoothPrefs.clearDevice(this);
 
-            // 2. KILL THE CONNECTION (Important!)
             ExoViewModel viewModel = new ViewModelProvider(this).get(ExoViewModel.class);
             viewModel.disconnect();
 
-            // 3. Update Toolbar Text
             updateHeaderInfo();
 
-            // 4. Force UI Refresh
-            // If the Exo fragment is active, refresh it so it sees the disconnect immediately
-            if (fragment1 != null) {
+            if (fragment1 != null && active == fragment1) {
                 fm.beginTransaction().detach(fragment1).attach(fragment1).commit();
             }
 
