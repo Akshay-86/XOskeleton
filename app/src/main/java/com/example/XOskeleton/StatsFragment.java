@@ -23,7 +23,7 @@ public class StatsFragment extends Fragment {
 
     private LineChart chartVoltage;
     private LineChart chartCurrent;
-    private LineChart chartSpeed;
+    private LineChart chartVelocity;
     private ExoViewModel viewModel; // The Shared Data Box
     private float globalX = 0f; // Continually increasing X value
 
@@ -40,12 +40,12 @@ public class StatsFragment extends Fragment {
         // 1. Bind Views
         chartVoltage = view.findViewById(R.id.chartVoltage);
         chartCurrent = view.findViewById(R.id.chartCurrent);
-        chartSpeed = view.findViewById(R.id.chartSpeed);
+        chartVelocity = view.findViewById(R.id.chartSpeed);
 
         // 2. Configure Charts
         setupChart(chartVoltage, Color.parseColor("#FF5722")); // Orange
         setupChart(chartCurrent, Color.parseColor("#2196F3")); // Blue
-        setupChart(chartSpeed, Color.parseColor("#4CAF50"));   // Green
+        setupChart(chartVelocity, Color.parseColor("#4CAF50"));   // Green
 
         // 3. Connect to Data Stream
         viewModel = new ViewModelProvider(requireActivity()).get(ExoViewModel.class);
@@ -53,7 +53,7 @@ public class StatsFragment extends Fragment {
         // 4. Start Watching for Updates
         viewModel.voltage.observe(getViewLifecycleOwner(), value -> addEntry(chartVoltage, value));
         viewModel.current.observe(getViewLifecycleOwner(), value -> addEntry(chartCurrent, value));
-        viewModel.speed.observe(getViewLifecycleOwner(), value -> addEntry(chartSpeed, value));
+        viewModel.speed.observe(getViewLifecycleOwner(), value -> addEntry(chartVelocity, value));
     }
 
     // --- HELPER: Pushes a new point to the graph ---
