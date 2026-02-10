@@ -1,5 +1,6 @@
 package com.example.XOskeleton;
 
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,7 +21,7 @@ public class DevPropertyAdapter extends RecyclerView.Adapter<DevPropertyAdapter.
     }
 
     private final List<PropertyItem> items = new ArrayList<>();
-    private final Set<String> activeKeys = new HashSet<>(); // Tracks what is currently plotted
+    private final Set<String> activeKeys = new HashSet<>();
     private final OnItemActionListener actionListener;
 
     public interface OnItemActionListener {
@@ -31,14 +32,16 @@ public class DevPropertyAdapter extends RecyclerView.Adapter<DevPropertyAdapter.
         this.actionListener = listener;
     }
 
-    // Updated to accept the list of active plots
     public void updateData(List<PropertyItem> newItems, List<String> plottedLeft, List<String> plottedRight) {
-        // Update Active Keys Set for fast lookup
+        // 1. CAPTURE OLD STATE
+        Set<String> oldActiveKeys = new HashSet<>(activeKeys);
+
+        // 2. UPDATE NEW STATE
         activeKeys.clear();
         if (plottedLeft != null) activeKeys.addAll(plottedLeft);
         if (plottedRight != null) activeKeys.addAll(plottedRight);
 
-        // Standard List Update Logic
+        // 3. HANDLE STRUCTURE CHANGE (Different size? Reset list)
         if (items.size() != newItems.size()) {
             items.clear();
             items.addAll(newItems);
@@ -46,22 +49,25 @@ public class DevPropertyAdapter extends RecyclerView.Adapter<DevPropertyAdapter.
             return;
         }
 
+        // 4. SMART UPDATE (Same size? Update rows)
         for (int i = 0; i < items.size(); i++) {
             PropertyItem oldItem = items.get(i);
             PropertyItem newItem = newItems.get(i);
+            String name = newItem.name;
 
-            // Check if plot state changed for this item (e.g., user just clicked plot)
-            boolean wasPlotted = activeKeys.contains(oldItem.name);
-            boolean isPlotted = activeKeys.contains(newItem.name);
-
-            // Check if value changed
+            // Detect Changes
+            boolean wasPlotted = oldActiveKeys.contains(name);
+            boolean isNowPlotted = activeKeys.contains(name);
             boolean valueChanged = !oldItem.value.equals(newItem.value);
+            boolean nameChanged = !oldItem.name.equals(newItem.name); // Check name change too!
 
-            oldItem.value = newItem.value; // Sync data
+            // Sync Data
+            oldItem.value = newItem.value;
+            oldItem.name = newItem.name; // CRITICAL FIX: Update Name!
 
-            if (valueChanged || wasPlotted != isPlotted) {
-                // Refresh row if Text changed OR Plot State changed
-                notifyItemChanged(i, "UPDATE_content");
+            // Refresh Row if ANYTHING changed
+            if (valueChanged || nameChanged || wasPlotted != isNowPlotted) {
+                notifyItemChanged(i, "UPDATE_CONTENT");
             }
         }
     }
@@ -81,7 +87,7 @@ public class DevPropertyAdapter extends RecyclerView.Adapter<DevPropertyAdapter.
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position, @NonNull List<Object> payloads) {
         if (!payloads.isEmpty()) {
-            bind(holder, position); // Just re-bind logic, it's cheap
+            bind(holder, position);
         } else {
             super.onBindViewHolder(holder, position, payloads);
         }
@@ -94,16 +100,15 @@ public class DevPropertyAdapter extends RecyclerView.Adapter<DevPropertyAdapter.
         holder.textKey.setText(item.name);
         holder.textValue.setText(item.value);
 
-        // Toggle Icon based on state
+        // Logic for Button Appearance
         if (isPlotted) {
             holder.btnAction.setText("-");
-            holder.btnAction.setTextColor(0xFFFF0000); // Red for remove
+            holder.btnAction.setTextColor(Color.RED);
         } else {
             holder.btnAction.setText("+");
-            holder.btnAction.setTextColor(0xFF000000); // Black for add
+            holder.btnAction.setTextColor(Color.BLACK);
         }
 
-        // Click Listener for the BUTTON only
         holder.btnAction.setOnClickListener(v -> {
             actionListener.onActionClick(v, item.name, isPlotted);
         });

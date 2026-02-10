@@ -5,16 +5,12 @@ import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
-
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.MutableLiveData;
-
-import com.github.mikephil.charting.data.Entry; // Import for Chart Entry
-
+import com.github.mikephil.charting.data.Entry;
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
@@ -28,17 +24,15 @@ import java.util.Map;
 
 public class ExoViewModel extends AndroidViewModel {
 
-    // --- 1. UI Live Data (General) ---
     public final MutableLiveData<String> statusMessage = new MutableLiveData<>();
     public final MutableLiveData<Boolean> isConnected = new MutableLiveData<>(false);
     public final MutableLiveData<JSONObject> liveDataPacket = new MutableLiveData<>();
 
-    // --- 2. CHART DATA (Restored for StatsFragment) ---
+    // Stats Fragment Data
     public final MutableLiveData<Float> voltage = new MutableLiveData<>();
     public final MutableLiveData<Float> current = new MutableLiveData<>();
     public final MutableLiveData<Float> speed = new MutableLiveData<>();
 
-    // --- Internals ---
     private BluetoothSocket socket;
     private volatile boolean isRunning = false;
     private final DataLogger logger;
@@ -52,31 +46,22 @@ public class ExoViewModel extends AndroidViewModel {
         logger = new DataLogger(application);
     }
 
-    // ==========================================
-    //           BLUETOOTH CONNECTION
-    // ==========================================
-
     @SuppressLint("MissingPermission")
     public void connect(String macAddress) {
         if (isRunning || macAddress == null) return;
         statusMessage.setValue("Connecting...");
-
         new Thread(() -> {
             try {
                 BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(macAddress);
                 Method m = device.getClass().getMethod("createRfcommSocket", int.class);
                 socket = (BluetoothSocket) m.invoke(device, 1);
-
                 if (socket != null) {
                     socket.connect();
                     isRunning = true;
                     isConnected.postValue(true);
                     statusMessage.postValue("Connected!");
-
-                    // Reset logging for new session
                     csvHeaders = null;
                     logger.createNewFile();
-
                     startReadingLoop();
                 }
             } catch (Exception e) {
@@ -88,38 +73,35 @@ public class ExoViewModel extends AndroidViewModel {
 
     public void disconnect() {
         isRunning = false;
-        try { if (socket != null) socket.close(); } catch (IOException e) { e.printStackTrace(); }
+        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
         isConnected.postValue(false);
         statusMessage.postValue("Disconnected");
     }
 
     private void startReadingLoop() {
         byte[] lengthHeader = new byte[2];
-
         try {
             InputStream inputStream = socket.getInputStream();
             while (isRunning) {
-                // Read Header
                 if (readExactly(inputStream, lengthHeader, 2) == -1) break;
                 int payloadSize = ((lengthHeader[0] & 0xFF) << 8) | (lengthHeader[1] & 0xFF);
-
-                // Read Payload
                 byte[] payload = new byte[payloadSize];
                 if (readExactly(inputStream, payload, payloadSize) == -1) break;
 
                 String jsonString = new String(payload, StandardCharsets.UTF_8);
-
                 try {
                     JSONObject json = new JSONObject(jsonString);
-
-                    // A. Update General UI
                     liveDataPacket.postValue(json);
 
-                    // B. Update StatsFragment Charts
-                    parseChartData(json);
+                    // 1. Flatten the JSON (Dynamic Discovery)
+                    Map<String, String> flatMap = new HashMap<>();
+                    flatten(json, "", flatMap);
 
-                    // C. Log to CSV
-                    logDynamicJson(json);
+                    // 2. Parse Stats using the Flattened Keys (Dynamic)
+                    parseChartDataDynamic(flatMap);
+
+                    // 3. Log to CSV
+                    logDynamicJson(flatMap);
 
                 } catch (Exception ignored) {}
             }
@@ -130,111 +112,46 @@ public class ExoViewModel extends AndroidViewModel {
         }
     }
 
-    // ==========================================
-    //           OFFLINE FILE HANDLING
-    // ==========================================
+    // --- DYNAMIC STATS PARSING ---
+    private void parseChartDataDynamic(Map<String, String> flatMap) {
+        List<Float> voltageValues = new ArrayList<>();
+        List<Float> currentValues = new ArrayList<>();
+        List<Float> speedValues = new ArrayList<>();
 
-    // 1. Get list of available CSV files
-    public List<String> getLogFiles() {
-        return logger.getAllFiles();
-    }
-
-    // 2. Get just the headers (First row) to populate the "Properties" list
-    public List<String> getCsvHeaders(String fileName) {
-        // Read the file using DataLogger (reads all lines)
-        List<String[]> lines = logger.readFile(fileName);
-        if (!lines.isEmpty()) {
-            String[] headerRow = lines.get(0);
-            List<String> headers = new ArrayList<>();
-            Collections.addAll(headers, headerRow);
-            return headers;
-        }
-        return new ArrayList<>();
-    }
-
-    // 3. Extract a specific column for plotting
-    // Returns a list of (X,Y) entries for the graph
-    public List<Entry> getColumnData(String fileName, String columnName) {
-        List<Entry> entries = new ArrayList<>();
-        List<String[]> lines = logger.readFile(fileName);
-
-        if (lines.size() < 2) return entries; // Empty or just header
-
-        String[] headers = lines.get(0);
-        int colIndex = -1;
-        int timeIndex = -1;
-
-        // Find indices for the requested column AND the timestamp
-        for (int i = 0; i < headers.length; i++) {
-            if (headers[i].equals(columnName)) colIndex = i;
-            if (headers[i].contains("timestamp") || headers[i].contains("ts")) timeIndex = i;
-        }
-
-        if (colIndex == -1) return entries; // Column not found
-
-        // Parse rows
-        long startTime = 0;
-        for (int i = 1; i < lines.size(); i++) {
-            String[] row = lines.get(i);
-            // Ensure row is valid and has data for our column
-            if (row.length <= colIndex) continue;
+        for (Map.Entry<String, String> entry : flatMap.entrySet()) {
+            String key = entry.getKey().toLowerCase();
+            if (!key.contains(".")) continue;
 
             try {
-                // Parse Y Value
-                float y = Float.parseFloat(row[colIndex]);
-
-                // Parse X Value (Time)
-                float x = i; // Default to row index
-                if (timeIndex != -1 && row.length > timeIndex) {
-                    float ts = Float.parseFloat(row[timeIndex]);
-                    if (startTime == 0) startTime = (long) ts; // First row sets the start time
-                    x = ts - startTime; // Normalize (Start at 0 seconds)
+                float val = Float.parseFloat(entry.getValue());
+                if (key.endsWith(".voltage") || key.endsWith(".volt")) {
+                    voltageValues.add(val);
+                } else if (key.endsWith(".current") || key.endsWith(".curr") || key.endsWith(".amps")) {
+                    currentValues.add(val);
+                } else if (key.endsWith(".velocity") || key.endsWith(".speed") || key.endsWith(".rpm")) {
+                    speedValues.add(val);
                 }
-
-                entries.add(new Entry(x, y));
-            } catch (NumberFormatException ignored) {
-                // Skip rows with bad data
-            }
+            } catch (NumberFormatException ignored) {}
         }
-        return entries;
+
+        if (!voltageValues.isEmpty()) voltage.postValue(calculateAverage(voltageValues));
+        if (!currentValues.isEmpty()) current.postValue(calculateAverage(currentValues));
+        if (!speedValues.isEmpty()) speed.postValue(calculateAverage(speedValues));
     }
 
-    // ==========================================
-    //             INTERNAL HELPERS
-    // ==========================================
-
-    private void parseChartData(JSONObject json) {
-        JSONObject sys = json.optJSONObject("system");
-        if (sys != null) {
-            JSONObject batt = sys.optJSONObject("battery");
-            if (batt != null) {
-                voltage.postValue((float) batt.optDouble("voltage", 0));
-                current.postValue((float) batt.optDouble("current", 0));
-            }
-        }
-
-        JSONObject motors = json.optJSONObject("motors");
-        if (motors != null) {
-            JSONObject left = motors.optJSONObject("left");
-            if (left == null) left = motors.optJSONObject("Left");
-
-            if (left != null) {
-                // Assuming "var1" is RPM based on your standard packet
-                speed.postValue((float) left.optDouble("var1", 0));
-            }
-        }
+    private float calculateAverage(List<Float> values) {
+        float sum = 0;
+        for (float v : values) sum += v;
+        return sum / values.size();
     }
 
-    private void logDynamicJson(JSONObject json) throws JSONException {
-        Map<String, String> flatMap = new HashMap<>();
-        flatten(json, "", flatMap);
-
+    // --- LOGGING ---
+    private void logDynamicJson(Map<String, String> flatMap) {
         if (csvHeaders == null) {
             csvHeaders = new ArrayList<>(flatMap.keySet());
             Collections.sort(csvHeaders);
             logger.save(String.join(",", csvHeaders));
         }
-
         synchronized (csvBuilder) {
             csvBuilder.setLength(0);
             for (int i = 0; i < csvHeaders.size(); i++) {
@@ -253,12 +170,8 @@ public class ExoViewModel extends AndroidViewModel {
             String key = keys.next();
             Object value = json.get(key);
             String newKey = prefix.isEmpty() ? key : prefix + "." + key;
-
-            if (value instanceof JSONObject) {
-                flatten((JSONObject) value, newKey, out);
-            } else {
-                out.put(newKey, String.valueOf(value));
-            }
+            if (value instanceof JSONObject) flatten((JSONObject) value, newKey, out);
+            else out.put(newKey, String.valueOf(value));
         }
     }
 
@@ -272,9 +185,62 @@ public class ExoViewModel extends AndroidViewModel {
         return bytesRead;
     }
 
-    @Override
-    protected void onCleared() {
-        super.onCleared();
-        disconnect();
+    // --- FILE OPERATIONS (OFFLINE GRAPH FIX) ---
+    public List<String> getLogFiles() { return logger.getAllFiles(); }
+
+    public List<String> getCsvHeaders(String fileName) {
+        List<String[]> lines = logger.readFile(fileName);
+        if (!lines.isEmpty()) {
+            List<String> headers = new ArrayList<>();
+            Collections.addAll(headers, lines.get(0));
+            return headers;
+        }
+        return new ArrayList<>();
     }
+
+    public List<Entry> getColumnData(String fileName, String columnName) {
+        List<Entry> entries = new ArrayList<>();
+        List<String[]> lines = logger.readFile(fileName);
+        if (lines.size() < 2) return entries;
+
+        String[] headers = lines.get(0);
+        int colIndex = -1, timeIndex = -1;
+        for (int i = 0; i < headers.length; i++) {
+            // Trim to avoid issues with CSV spaces
+            if (headers[i].trim().equals(columnName)) colIndex = i;
+            if (headers[i].toLowerCase().contains("timestamp") || headers[i].equals("ts")) timeIndex = i;
+        }
+        if (colIndex == -1) return entries;
+
+        // Use DOUBLE for precision
+        double startTime = 0;
+
+        for (int i = 1; i < lines.size(); i++) {
+            String[] row = lines.get(i);
+            if (row.length <= colIndex) continue;
+            try {
+                float y = Float.parseFloat(row[colIndex]);
+                float x = i; // Default to row index
+
+                if (timeIndex != -1 && row.length > timeIndex) {
+                    // FIX: Parse as Double to keep the precision!
+                    double ts = Double.parseDouble(row[timeIndex]);
+
+                    // Convert Python Seconds (1.7e9) to MS logic if needed
+                    // But usually, we just need the difference.
+                    if (ts < 10000000000.0) ts *= 1000.0;
+
+                    if (startTime == 0) startTime = ts;
+
+                    // Calculate difference using Doubles, THEN cast to float for chart
+                    x = (float) ((ts - startTime) / 1000.0);
+                }
+                entries.add(new Entry(x, y));
+            } catch (Exception ignored) {}
+        }
+        return entries;
+    }
+
+    @Override
+    protected void onCleared() { super.onCleared(); disconnect(); }
 }

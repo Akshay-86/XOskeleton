@@ -24,6 +24,7 @@
         <ImageView
             android:layout_width="40dp"
             android:layout_height="40dp"
+            android:layout_margin="8dp"
             android:id="@+id/logo_header"
             android:layout_gravity="start|center_vertical"
             android:src="@drawable/logo" />
@@ -48,9 +49,6 @@
                 android:src="@drawable/bluetooth_off" />
 
         </LinearLayout>
-
-
-
 
         <LinearLayout
             android:id="@+id/device_details"
@@ -78,9 +76,7 @@
 
         </LinearLayout>
 
-
     </androidx.appcompat.widget.Toolbar>
-
 
 
     <ImageView

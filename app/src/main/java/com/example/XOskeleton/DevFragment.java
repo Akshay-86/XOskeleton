@@ -9,16 +9,13 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.PopupMenu;
 import android.widget.Spinner;
-import android.widget.TextView;
 import android.widget.ToggleButton;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
@@ -27,9 +24,7 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
-
 import org.json.JSONObject;
-
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,23 +43,20 @@ public class DevFragment extends Fragment {
     private ArrayAdapter<String> motorSpinnerAdapter;
     private ArrayAdapter<String> fileSpinnerAdapter;
 
-    // UI State
     private boolean isLive = true;
     private String selectedMotorKey = null;
-    private String selectedFileName = null; // For Offline Mode
+    private String selectedFileName = null;
 
-    // Data Lists
     private final List<String> availableMotors = new ArrayList<>();
     private final List<String> availableFiles = new ArrayList<>();
+    private final List<String> offlineHeaders = new ArrayList<>();
 
-    // Offline Data Maps (Motor Name -> List of Properties)
-    private final List<String> offlineProperties = new ArrayList<>();
+    // CACHE FOR UI REFRESH
+    private final List<DevPropertyAdapter.PropertyItem> currentProps = new ArrayList<>();
 
-    // Plotting State
     private final List<String> activeLeftPlots = new ArrayList<>();
     private final List<String> activeRightPlots = new ArrayList<>();
 
-    // TIME LOGIC
     private long startTime = 0;
     private float currentX = 0f;
 
@@ -92,7 +84,6 @@ public class DevFragment extends Fragment {
         RecyclerView recycler = view.findViewById(R.id.recyclerProperties);
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
 
-        // --- ADAPTER ---
         adapter = new DevPropertyAdapter((view1, propertyName, isCurrentlyPlotted) -> {
             if (isCurrentlyPlotted) {
                 removePlot(propertyName);
@@ -102,7 +93,7 @@ public class DevFragment extends Fragment {
         });
         recycler.setAdapter(adapter);
 
-        // --- SPINNER: MOTOR ---
+        // --- SPINNERS & TOGGLE ---
         spinnerMotor = view.findViewById(R.id.spinnerMotor);
         motorSpinnerAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, availableMotors);
         motorSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -114,15 +105,15 @@ public class DevFragment extends Fragment {
                     String newKey = availableMotors.get(position);
                     if (!newKey.equals(selectedMotorKey)) {
                         selectedMotorKey = newKey;
-                        if (!isLive) updateOfflinePropertyList(); // Update list if offline
-                        else clearChart();
+                        // --- FIX: WIPE SCREEN IMMEDIATELY ---
+                        wipeScreen();
+                        if (!isLive) updateOfflinePropertyList();
                     }
                 }
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        // --- SPINNER: FILE (Offline) ---
         layoutFileSelector = view.findViewById(R.id.layoutFileSelector);
         spinnerFile = view.findViewById(R.id.spinnerFile);
         fileSpinnerAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, availableFiles);
@@ -133,27 +124,24 @@ public class DevFragment extends Fragment {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (position >= 0 && position < availableFiles.size()) {
                     selectedFileName = availableFiles.get(position);
+                    wipeScreen(); // WIPE ON FILE CHANGE
                     loadOfflineFileHeaders(selectedFileName);
                 }
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        // --- TOGGLE BUTTON ---
         ToggleButton toggle = view.findViewById(R.id.toggleMode);
-        toggle.setChecked(true); // Default Live
+        toggle.setChecked(true);
         toggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isLive = isChecked;
             layoutFileSelector.setVisibility(isLive ? View.GONE : View.VISIBLE);
 
-            // RESET EVERYTHING ON TOGGLE
-            clearChart();
+            wipeScreen(); // WIPE ON TOGGLE
             availableMotors.clear();
             motorSpinnerAdapter.notifyDataSetChanged();
-            adapter.updateData(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
 
             if (!isLive) {
-                // LOAD FILES
                 availableFiles.clear();
                 availableFiles.addAll(viewModel.getLogFiles());
                 fileSpinnerAdapter.notifyDataSetChanged();
@@ -163,18 +151,13 @@ public class DevFragment extends Fragment {
         viewModel.liveDataPacket.observe(getViewLifecycleOwner(), this::processLivePacket);
     }
 
-    // ==========================================
-    //              LIVE LOGIC
-    // ==========================================
     private void processLivePacket(JSONObject json) {
-        if (!isLive) return; // Ignore if offline
+        if (!isLive) return;
 
-        // Time Calc
         long now = System.currentTimeMillis();
         if (startTime == 0) startTime = now;
         currentX = (now - startTime) / 1000f;
 
-        // 1. Discovery
         boolean listChanged = false;
         Iterator<String> keys = json.keys();
         while (keys.hasNext()) {
@@ -193,24 +176,24 @@ public class DevFragment extends Fragment {
             }
         }
 
-        // 2. Plotting & List
         if (selectedMotorKey != null) {
             JSONObject motorData = json.optJSONObject(selectedMotorKey);
             if (motorData != null) {
-                List<DevPropertyAdapter.PropertyItem> props = new ArrayList<>();
+                currentProps.clear(); // Update Cache
                 Iterator<String> propKeys = motorData.keys();
                 while (propKeys.hasNext()) {
                     String key = propKeys.next();
                     String val = String.valueOf(motorData.opt(key));
-                    props.add(new DevPropertyAdapter.PropertyItem(key, val));
+                    currentProps.add(new DevPropertyAdapter.PropertyItem(key, val));
 
                     double doubleVal = motorData.optDouble(key, Double.NaN);
                     if (!Double.isNaN(doubleVal)) {
                         updateLiveChart(key, doubleVal);
                     }
                 }
-                Collections.sort(props, (p1, p2) -> p1.name.compareTo(p2.name));
-                adapter.updateData(props, activeLeftPlots, activeRightPlots);
+                Collections.sort(currentProps, (p1, p2) -> p1.name.compareTo(p2.name));
+                // Pass active plots so button knows to show (-)
+                adapter.updateData(currentProps, activeLeftPlots, activeRightPlots);
             }
         }
     }
@@ -229,7 +212,6 @@ public class DevFragment extends Fragment {
             data.addDataSet(set);
         }
 
-        // Sync Color
         if (isLeft) chart.getAxisLeft().setTextColor(set.getColor());
         else chart.getAxisRight().setTextColor(set.getColor());
 
@@ -242,30 +224,24 @@ public class DevFragment extends Fragment {
         chart.moveViewToX(currentX);
     }
 
-    // ==========================================
-    //              OFFLINE LOGIC
-    // ==========================================
-
-    // 1. Parse Headers from CSV to find "Motors" (e.g. "right.rpm" -> Motor "right")
+    // --- OFFLINE LOGIC ---
     private void loadOfflineFileHeaders(String fileName) {
         List<String> headers = viewModel.getCsvHeaders(fileName);
         availableMotors.clear();
-        offlineProperties.clear(); // Temporary hold all props
+        offlineHeaders.clear();
+        offlineHeaders.addAll(headers);
 
         for (String h : headers) {
-            if (h.contains(".")) {
-                String[] parts = h.split("\\.");
-                String motor = parts[0]; // "right"
+            int dotIndex = h.indexOf('.');
+            if (dotIndex != -1) {
+                String motor = h.substring(0, dotIndex);
                 if (!availableMotors.contains(motor)) {
                     availableMotors.add(motor);
                 }
             }
-            offlineProperties.add(h);
         }
         Collections.sort(availableMotors);
         motorSpinnerAdapter.notifyDataSetChanged();
-
-        // Auto select first motor
         if (!availableMotors.isEmpty()) {
             spinnerMotor.setSelection(0);
             selectedMotorKey = availableMotors.get(0);
@@ -273,63 +249,98 @@ public class DevFragment extends Fragment {
         }
     }
 
-    // 2. Show Properties for Selected Motor (No Values)
     private void updateOfflinePropertyList() {
         if (selectedMotorKey == null) return;
+        currentProps.clear(); // Update Cache
+        String prefix = selectedMotorKey + ".";
 
-        List<DevPropertyAdapter.PropertyItem> props = new ArrayList<>();
-
-        // Filter properties that belong to this motor
-        for (String fullKey : offlineProperties) {
-            if (fullKey.startsWith(selectedMotorKey + ".")) {
-                // Extract "rpm" from "right.rpm"
-                String shortName = fullKey.substring(selectedMotorKey.length() + 1);
-                // Value is empty in offline mode
-                props.add(new DevPropertyAdapter.PropertyItem(shortName, ""));
+        for (String fullKey : offlineHeaders) {
+            if (fullKey.startsWith(prefix)) {
+                String shortName = fullKey.substring(prefix.length());
+                currentProps.add(new DevPropertyAdapter.PropertyItem(shortName, ""));
             }
         }
-        Collections.sort(props, (p1, p2) -> p1.name.compareTo(p2.name));
-        adapter.updateData(props, activeLeftPlots, activeRightPlots);
+        Collections.sort(currentProps, (p1, p2) -> p1.name.compareTo(p2.name));
+        adapter.updateData(currentProps, activeLeftPlots, activeRightPlots);
     }
 
-    // 3. Plot Entire Column from File
     private void plotOfflineColumn(String shortPropertyName, boolean isLeft) {
         if (selectedFileName == null || selectedMotorKey == null) return;
-
-        // Reconstruct full CSV key: "right" + "." + "rpm"
         String fullKey = selectedMotorKey + "." + shortPropertyName;
 
-        // 1. Get Data from ViewModel (Runs on main thread, but fast enough for 10MB)
         List<Entry> entries = viewModel.getColumnData(selectedFileName, fullKey);
-
         if (entries.isEmpty()) return;
 
         LineData data = chart.getData();
         if (data == null) { data = new LineData(); chart.setData(data); }
 
-        // 2. Create DataSet with ALL entries
         LineDataSet set = createDataSet(shortPropertyName, isLeft ? YAxis.AxisDependency.LEFT : YAxis.AxisDependency.RIGHT);
-        set.setValues(entries); // Set all at once
-        set.setDrawCircles(false); // Disable circles for performance on large datasets
-
+        set.setValues(entries);
+        set.setDrawCircles(false);
         data.addDataSet(set);
 
-        // Sync Color
         if (isLeft) chart.getAxisLeft().setTextColor(set.getColor());
         else chart.getAxisRight().setTextColor(set.getColor());
 
-        // 3. Refresh
         data.notifyDataChanged();
         chart.notifyDataSetChanged();
-
-        // Reset View to fit all data
         chart.fitScreen();
         chart.invalidate();
     }
 
-    // ==========================================
-    //              SHARED HELPERS
-    // ==========================================
+    // --- HELPERS ---
+
+    // FIX 1: WIPE SCREEN HELPER
+    private void wipeScreen() {
+        // 1. Clear Plot Logic
+        activeLeftPlots.clear();
+        activeRightPlots.clear();
+
+        // 2. Clear Graph Visuals
+        clearChart();
+
+        // 3. Clear List Visuals (Show empty list to prove we switched)
+        currentProps.clear();
+        adapter.updateData(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+    }
+
+    private void refreshAdapterState() {
+        adapter.updateData(currentProps, activeLeftPlots, activeRightPlots);
+    }
+
+    private void removePlot(String propertyName) {
+        activeLeftPlots.remove(propertyName);
+        activeRightPlots.remove(propertyName);
+        removeDataSet(propertyName);
+        refreshAdapterState(); // Force Button Update Immediately
+    }
+
+    private void showPlotMenu(View view, String propertyName) {
+        PopupMenu popup = new PopupMenu(requireContext(), view);
+        popup.getMenu().add(0, 1, 0, "Plot Left Axis");
+        popup.getMenu().add(0, 2, 0, "Plot Right Axis");
+
+        popup.setOnMenuItemClickListener(item -> {
+            boolean isLeft = (item.getItemId() == 1);
+            if (isLeft) {
+                activeLeftPlots.add(propertyName);
+                activeRightPlots.remove(propertyName);
+            } else {
+                activeRightPlots.add(propertyName);
+                activeLeftPlots.remove(propertyName);
+            }
+
+            if (isLive) {
+                refreshChartConfig(propertyName, isLeft ? YAxis.AxisDependency.LEFT : YAxis.AxisDependency.RIGHT);
+            } else {
+                removeDataSet(propertyName);
+                plotOfflineColumn(propertyName, isLeft);
+            }
+            refreshAdapterState(); // Force Button Update Immediately
+            return true;
+        });
+        popup.show();
+    }
 
     private LineDataSet createDataSet(String label, YAxis.AxisDependency axis) {
         LineDataSet set = new LineDataSet(null, label);
@@ -345,12 +356,17 @@ public class DevFragment extends Fragment {
         return set;
     }
 
-    private void removePlot(String propertyName) {
-        activeLeftPlots.remove(propertyName);
-        activeRightPlots.remove(propertyName);
-        removeDataSet(propertyName);
-        // If offline, refresh list to update (-) back to (+)
-        if (!isLive) updateOfflinePropertyList();
+    private void refreshChartConfig(String label, YAxis.AxisDependency axis) {
+        if (chart.getData() != null) {
+            LineDataSet set = (LineDataSet) chart.getData().getDataSetByLabel(label, false);
+            if (set != null) {
+                set.setAxisDependency(axis);
+                if (axis == YAxis.AxisDependency.LEFT) chart.getAxisLeft().setTextColor(set.getColor());
+                else chart.getAxisRight().setTextColor(set.getColor());
+                chart.notifyDataSetChanged();
+                chart.invalidate();
+            }
+        }
     }
 
     private void removeDataSet(String label) {
@@ -358,52 +374,6 @@ public class DevFragment extends Fragment {
             ILineDataSet set = chart.getData().getDataSetByLabel(label, false);
             if (set != null) {
                 chart.getData().removeDataSet(set);
-                chart.notifyDataSetChanged();
-                chart.invalidate();
-            }
-        }
-    }
-
-    private void showPlotMenu(View view, String propertyName) {
-        PopupMenu popup = new PopupMenu(requireContext(), view);
-        popup.getMenu().add(0, 1, 0, "Plot Left Axis");
-        popup.getMenu().add(0, 2, 0, "Plot Right Axis");
-
-        popup.setOnMenuItemClickListener(item -> {
-            boolean isLeft = (item.getItemId() == 1);
-
-            if (isLeft) {
-                activeLeftPlots.add(propertyName);
-                activeRightPlots.remove(propertyName);
-            } else {
-                activeRightPlots.add(propertyName);
-                activeLeftPlots.remove(propertyName);
-            }
-
-            if (isLive) {
-                // Live Mode: Just configure empty set, data comes later
-                refreshChartConfig(propertyName, isLeft ? YAxis.AxisDependency.LEFT : YAxis.AxisDependency.RIGHT);
-            } else {
-                // Offline Mode: LOAD DATA NOW
-                // Remove old if exists (to avoid duplicates or axis switch issues)
-                removeDataSet(propertyName);
-                plotOfflineColumn(propertyName, isLeft);
-                updateOfflinePropertyList(); // Update adapter UI
-            }
-            return true;
-        });
-        popup.show();
-    }
-
-    private void refreshChartConfig(String label, YAxis.AxisDependency axis) {
-        if (chart.getData() != null) {
-            LineDataSet set = (LineDataSet) chart.getData().getDataSetByLabel(label, false);
-            if (set != null) {
-                set.setAxisDependency(axis);
-                // Sync Color
-                if (axis == YAxis.AxisDependency.LEFT) chart.getAxisLeft().setTextColor(set.getColor());
-                else chart.getAxisRight().setTextColor(set.getColor());
-
                 chart.notifyDataSetChanged();
                 chart.invalidate();
             }
@@ -424,9 +394,8 @@ public class DevFragment extends Fragment {
             private final SimpleDateFormat mFormat = new SimpleDateFormat("h:mm:ss a", Locale.US);
             @Override
             public String getFormattedValue(float value) {
-                // In offline mode, 'value' might just be seconds, or timestamp
-                // If it's large timestamp, format it. If small (0-100), maybe format differently?
-                // For now, assume it's timestamp-based
+                // If offline, startTime is already MS. If live, it's MS.
+                // Value is seconds offset.
                 long originalTimestamp = startTime + (long)(value * 1000);
                 return mFormat.format(new Date(originalTimestamp));
             }
@@ -448,7 +417,7 @@ public class DevFragment extends Fragment {
             chart.getData().clearValues();
             chart.clear();
         }
-        chart.fitScreen(); // Reset zoom
+        chart.fitScreen();
         chart.getAxisLeft().setTextColor(Color.DKGRAY);
         chart.getAxisRight().setTextColor(Color.DKGRAY);
     }

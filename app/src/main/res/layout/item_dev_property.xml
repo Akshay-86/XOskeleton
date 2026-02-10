@@ -33,7 +33,7 @@
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:text="+"
-        android:textSize="24sp"
+        android:textSize="32sp"
         android:textStyle="bold"
         android:textColor="?stringColor"
         android:gravity="center"
