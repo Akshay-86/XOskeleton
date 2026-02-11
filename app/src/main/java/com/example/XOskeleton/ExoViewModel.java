@@ -243,4 +243,29 @@ public class ExoViewModel extends AndroidViewModel {
 
     @Override
     protected void onCleared() { super.onCleared(); disconnect(); }
+
+    public long getFileStartTime(String fileName) {
+        List<String[]> lines = logger.readFile(fileName);
+        if (lines.size() < 2) return 0;
+
+        String[] headers = lines.get(0);
+        int timeIndex = -1;
+        for (int i = 0; i < headers.length; i++) {
+            if (headers[i].toLowerCase().contains("timestamp") || headers[i].equals("ts")) {
+                timeIndex = i;
+                break;
+            }
+        }
+
+        if (timeIndex != -1) {
+            try {
+                String val = lines.get(1)[timeIndex]; // First data row
+                double ts = Double.parseDouble(val);
+                // Convert Python seconds to Java Milliseconds if needed
+                if (ts < 10000000000.0) ts *= 1000.0;
+                return (long) ts;
+            } catch (Exception e) { return 0; }
+        }
+        return 0;
+    }
 }
