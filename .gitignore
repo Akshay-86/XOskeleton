@@ -1,90 +1,52 @@
-# Built application files
-*.apk
-*.aab
-*.ap_
-
-# Android App Bundles (legacy)
-*.apks
-
-# Files for the ART/Dalvik VM
-*.dex
-
-# Java class files
-*.class
-
-# Generated files
+# Gradle files
+.gradle/
 /build/
 /app/build/
-**/build/
-**/app/build/
-/captures/
-.gradle/
-**/.gradle/
-gen/
-out/
-
-# Local configuration file (sdk path, etc)
+/app/.cxx/
+/app/src/main/.externalNativeBuild/
+/app/src/main/assets/
+/app/src/main/jniLibs/
+gradle-wrapper.jar
 local.properties
+*.iml
 
-# Log Files
+# Android Studio and IntelliJ IDEA files
+.idea/
+.project
+.DS_Store
+*.apk
+*.ap_
+*.aar
+*.dex
+*.so
+captures/
+lint-results.html
+lint-results.xml
+
+# Keystore files
+*.jks
+debug.keystore
+
+# Local Configuration
+.externalNativeBuild/
+
+# Misc
 *.log
+*.orig
+*.bak
+# Kotlin
+*.kpt
+.idea/libraries/
+.idea/workspace.xml
+# For kotlin dsl
+.gradle.enterprise/
+.sender/
 
-# Android Studio Navigation editor temp files
+# User-specific files that may be created by Android Studio
 .navigation/
 
-# Android Studio and IntelliJ IDEA
-*.iml
-*.ipr
-*.iws
-/.idea/
-**/.idea/
-modules.xml
-gradle.xml
-project.iml
-# Optional: Keystore files (uncomment if you don't want to commit them)
-# *.jks
-# *.keystore
-
-# External native build folder generated in Android Studio 2.2 and later
-.externalNativeBuild/
-.cxx/
-**/.externalNativeBuild/
-**/.cxx/
-
-# Google Services (e.g. APIs or Firebase) - typically checked in, but good to be aware of
-# google-services.json
-
-# Profiling and inspection files
-*.hprof
-*.snapshot
-*.pyc
-*.pyo
-*.pyd
-
-# Python caches + environments
-**/__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.ipynb_checkpoints/
-.venv/
-venv/
-env/
-
-# Lint
-lint/reports/
-lint/intermediates/
-lint/generated/
-lint/outputs/
-lint/tmp/
-
-# IDE-specific folder from your project structure
-/.androidide/
-
-# Operating System Files
-.DS_Store
-Thumbs.db
-._*
-__pycache__
+# Room Persistence Library - Schema exports
+# For production builds, you should generally store and ship the schema.
+# For development, you can ignore it to avoid version control conflicts.
+# Uncomment the following line if you wish to ignore Room schema exports.
+# app/schemas/

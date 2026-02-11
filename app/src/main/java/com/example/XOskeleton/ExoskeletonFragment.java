@@ -6,6 +6,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -21,8 +22,14 @@ public class ExoskeletonFragment extends Fragment {
 
     private LinearLayout container;
     private TextView statusText;
-    private Button btnChangeDevice; // This will now ALWAYS say "Add Device"
+    private Button btnChangeDevice;
     private View btnReload;
+
+    // --- NEW: Command UI Elements ---
+    private View layoutCommand;
+    private EditText inputCommand;
+    private Button btnSetCommand;
+
     private ExoViewModel viewModel;
 
     @Nullable
@@ -40,21 +47,36 @@ public class ExoskeletonFragment extends Fragment {
         btnChangeDevice = view.findViewById(R.id.btnChangeDevice);
         btnReload = view.findViewById(R.id.btnReload);
 
+        // --- NEW: Init Views ---
+        layoutCommand = view.findViewById(R.id.layoutCommand);
+        inputCommand = view.findViewById(R.id.inputCommand);
+        btnSetCommand = view.findViewById(R.id.btnSetCommand);
+
         // 1. Set Button to always say "Add Device"
         btnChangeDevice.setText("Add Device");
 
         // 2. Connect to ViewModel
         viewModel = new ViewModelProvider(requireActivity()).get(ExoViewModel.class);
 
-        // 3. Observer: If Connected -> HIDE buttons. If Disconnected -> SHOW "Add Device"
+        // 3. Observer: Connection Status updates UI
         viewModel.isConnected.observe(getViewLifecycleOwner(), connected -> {
             if (connected) {
+                // Connected: Hide "Add Device", Show Commands
                 btnChangeDevice.setVisibility(View.GONE);
-                if (btnReload != null) btnReload.setVisibility(View.GONE); // Hide refresh too
+                if (btnReload != null) btnReload.setVisibility(View.GONE);
+
+                layoutCommand.setVisibility(View.VISIBLE);
+                inputCommand.setEnabled(true);
+                btnSetCommand.setEnabled(true);
             } else {
+                // Disconnected: Show "Add Device", Hide Commands
                 btnChangeDevice.setVisibility(View.VISIBLE);
                 if (btnReload != null) btnReload.setVisibility(View.VISIBLE);
                 statusText.setText("Status: Disconnected");
+
+                layoutCommand.setVisibility(View.GONE);
+                inputCommand.setEnabled(false);
+                btnSetCommand.setEnabled(false);
             }
         });
 
@@ -75,7 +97,6 @@ public class ExoskeletonFragment extends Fragment {
 
         if (btnReload != null) {
             btnReload.setOnClickListener(v -> {
-                // Try to reconnect to the last saved device (if any)
                 String savedMac = BluetoothPrefs.getLastAddress(requireContext());
                 if (savedMac != null) {
                     viewModel.connect(savedMac);
@@ -84,6 +105,16 @@ public class ExoskeletonFragment extends Fragment {
                 }
             });
         }
+
+        // --- NEW: Send Command Logic ---
+        btnSetCommand.setOnClickListener(v -> {
+            String val = inputCommand.getText().toString().trim();
+            if (!val.isEmpty()) {
+                // Send command "SET_VAL:100"
+                viewModel.sendCommand("SET_VAL:" + val);
+                inputCommand.setText(""); // Clear input
+            }
+        });
     }
 
     @Override

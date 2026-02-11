@@ -71,6 +71,27 @@ public class ExoViewModel extends AndroidViewModel {
         }).start();
     }
 
+    public void sendCommand(String command) {
+        if (socket == null || !Boolean.TRUE.equals(isConnected.getValue())) {
+            statusMessage.postValue("Not Connected");
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                // Add newline because Python's readline/decode often expects it
+                byte[] bytes = (command).getBytes(StandardCharsets.UTF_8);
+
+                // Write directly to the output stream
+                socket.getOutputStream().write(bytes);
+                socket.getOutputStream().flush();
+
+            } catch (IOException e) {
+                statusMessage.postValue("Send Failed");
+                e.printStackTrace();
+            }
+        }).start();
+    }
     public void disconnect() {
         isRunning = false;
         try { if (socket != null) socket.close(); } catch (IOException ignored) {}
