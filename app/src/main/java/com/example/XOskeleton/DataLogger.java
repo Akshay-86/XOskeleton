@@ -67,4 +67,10 @@ public class DataLogger {
         }
         return data;
     }
+
+    // Add this method to DataLogger.java
+    public File getLogDirectory() {
+        // Returns the folder where logs are saved: /Android/data/com.example.XOskeleton/files/
+        return context.getExternalFilesDir(null);
+    }
 }
