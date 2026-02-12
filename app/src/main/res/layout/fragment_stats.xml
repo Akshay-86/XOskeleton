@@ -83,11 +83,48 @@
             style="?attr/materialButtonOutlinedStyle"/>
     </com.google.android.material.button.MaterialButtonToggleGroup>
 
-    <com.github.mikephil.charting.charts.BarChart
-        android:id="@+id/historyChart"
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="@android:color/white"/>
+        android:layout_weight="1">
+
+        <TextView
+            android:id="@+id/labelY"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Active Duration (Minutes)"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#888"
+            android:layout_marginBottom="4dp"/>
+
+        <com.github.mikephil.charting.charts.BarChart
+            android:id="@+id/historyChart"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/labelY"
+            android:layout_above="@id/labelX"/>
+
+        <TextView
+            android:id="@+id/labelX"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Timeline"
+            android:textSize="10sp"
+            android:textStyle="italic"
+            android:textColor="#888"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="4dp"/>
+
+        <TextView
+            android:id="@+id/tvNoData"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No logs found for this period"
+            android:visibility="gone"
+            android:layout_centerInParent="true"/>
+
+    </RelativeLayout>
 
 </LinearLayout>

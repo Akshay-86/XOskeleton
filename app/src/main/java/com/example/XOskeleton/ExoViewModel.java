@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -139,13 +140,13 @@ public class ExoViewModel extends AndroidViewModel {
             SimpleDateFormat fileFormat = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US);
 
             SimpleDateFormat dayLabel = new SimpleDateFormat("MMM dd", Locale.US); // "Feb 10"
-            SimpleDateFormat hourLabel = new SimpleDateFormat("HH:00", Locale.US); // "14:00"
+            SimpleDateFormat hourLabel = new SimpleDateFormat("HH:mm:ss", Locale.US); // "14:00"
 
             long now = System.currentTimeMillis();
             // Filter: 7 days ago or 24 hours ago
             long cutoff = (mode == 0) ? (now - 7L * 24 * 3600 * 1000) : (now - 24L * 3600 * 1000);
 
-            for (File f : dir.listFiles()) {
+            for (File f : Objects.requireNonNull(dir.listFiles())) {
                 if (!f.getName().startsWith("Log_")) continue;
 
                 try {
