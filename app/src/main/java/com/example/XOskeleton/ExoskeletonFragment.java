@@ -7,6 +7,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.GridLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -17,6 +19,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.slider.Slider;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import java.text.DateFormat;
 import java.util.Date;
@@ -39,6 +42,11 @@ public class ExoskeletonFragment extends Fragment {
     private Slider powerSlider;
     private Button[] modeButtons;
 
+    private SwitchMaterial switchSmartAssist;
+    private GridLayout gridMotion;
+    private TextView textMotionValue;
+    private View statusMotionBar;
+    private View[] motionButtons;
     // Modes
     private static final int MODE_ECO = 0;
     private static final int MODE_TRANS = 1;
@@ -65,6 +73,10 @@ public class ExoskeletonFragment extends Fragment {
         btnChangeDevice = view.findViewById(R.id.btnChangeDevice);
         btnReload = view.findViewById(R.id.btnReload);
         bottomSheet = view.findViewById(R.id.bottomSheet);
+        switchSmartAssist = view.findViewById(R.id.switchSmartAssist);
+        gridMotion = view.findViewById(R.id.gridMotion);
+        textMotionValue = view.findViewById(R.id.textMotionValue);
+        statusMotionBar = view.findViewById(R.id.statusMotionBar);
 
         // **FIX:** Initialize sheetBehavior after bottomSheet has been found
         if (bottomSheet != null) {
@@ -80,6 +92,36 @@ public class ExoskeletonFragment extends Fragment {
         textModeDesc = view.findViewById(R.id.textModeDesc);
         textPowerPercent = view.findViewById(R.id.textPowerPercent);
         powerSlider = view.findViewById(R.id.powerSlider);
+
+        // Map the included layouts to an array for easy looping
+        // (Make sure IDs match what you put in the <include> tags!)
+        motionButtons = new View[]{
+                view.findViewById(R.id.btnWalk),
+                view.findViewById(R.id.btnRaceWalk),
+                view.findViewById(R.id.btnUphill),
+                view.findViewById(R.id.btnDownhill),
+                view.findViewById(R.id.btnStairsUp),
+                view.findViewById(R.id.btnStairsDown),
+                view.findViewById(R.id.btnGravel),
+                view.findViewById(R.id.btnCycling)
+        };
+
+        // Initialize Texts/Icons for the grid items manually (since we reused one layout)
+        setupGridItem(motionButtons[0], "Walking", R.drawable.ic_walking);
+        setupGridItem(motionButtons[1], "Race Walking", R.drawable.ic_running);
+        setupGridItem(motionButtons[2], "Uphill", R.drawable.ic_uphill);
+        setupGridItem(motionButtons[3], "Downhill", R.drawable.ic_downhill);
+        // ... set up the rest ...
+
+        // 2. SWITCH LISTENER
+        switchSmartAssist.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            updateSmartAssistUI(isChecked);
+            // Send command to device
+            // viewModel.sendCommand("SMART_ASSIST:" + (isChecked ? "ON" : "OFF"));
+        });
+
+        // Initialize state
+        updateSmartAssistUI(false);
 
 
         modeButtons = new Button[]{
@@ -233,6 +275,56 @@ public class ExoskeletonFragment extends Fragment {
         if (Boolean.FALSE.equals(viewModel.isConnected.getValue())) {
             String savedMac = BluetoothPrefs.getLastAddress(requireContext());
             if (savedMac != null) viewModel.connect(savedMac);
+        }
+    }
+
+    private void setupGridItem(View view, String title, int iconRes) {
+        if(view == null) return;
+        TextView tv = view.findViewById(R.id.itemText);
+        ImageView iv = view.findViewById(R.id.itemIcon);
+        tv.setText(title);
+        // iv.setImageResource(iconRes); // Uncomment when you have icons
+
+        // Click Listener for Manual Selection
+        view.setOnClickListener(v -> {
+            if (!switchSmartAssist.isChecked()) {
+                // Highlight this item, dim others
+                for(View btn : motionButtons) btn.setAlpha(0.5f);
+                view.setAlpha(1.0f);
+
+                // Update text
+                textMotionValue.setText(title);
+            }
+        });
+    }
+
+    private void updateSmartAssistUI(boolean isSmartAssistOn) {
+        if (isSmartAssistOn) {
+            // MODE: AI AUTOMATIC
+            // Disable Grid
+            for (View btn : motionButtons) {
+                if(btn != null) {
+                    btn.setEnabled(false);
+                    btn.setAlpha(0.3f); // Dim heavily
+                }
+            }
+
+            // Update Status Bar
+            textMotionValue.setText("AI Detecting...");
+            textMotionValue.setTextColor(Color.GREEN);
+
+        } else {
+            // MODE: MANUAL SELECTION
+            // Enable Grid
+            for (View btn : motionButtons) {
+                if(btn != null) {
+                    btn.setEnabled(true);
+                    btn.setAlpha(1.0f); // Full brightness
+                }
+            }
+
+            textMotionValue.setText("Select Mode Below");
+            textMotionValue.setTextColor(Color.WHITE);
         }
     }
 }

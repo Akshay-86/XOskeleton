@@ -170,35 +170,184 @@
                     style="@style/ModernSlider"/>
             </LinearLayout>
 
-            <com.google.android.material.card.MaterialCardView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="#333333"
-                app:cardCornerRadius="16dp"
-                android:layout_marginBottom="100dp">
+                android:orientation="vertical">
+
+                <View
+                    android:layout_width="60dp"
+                    android:layout_height="5dp"
+                    android:background="@drawable/bg_handle_bar"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginBottom="24dp"/>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="#1E1E1E"
+                    app:strokeColor="#333"
+                    app:strokeWidth="1dp"
+                    app:cardCornerRadius="24dp"
+                    android:layout_marginBottom="24dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="12dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="Adaptive Motion Recognition"
+                                android:textColor="#FFF"
+                                android:textSize="16sp"
+                                android:textStyle="bold"/>
+
+                            <com.google.android.material.switchmaterial.SwitchMaterial
+                                android:id="@+id/switchSmartAssist"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/statusMotionBar"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_status_bar_gray"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="8dp"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="16dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="Active Motion Status:"
+                                android:textColor="#AAA"
+                                android:textSize="12sp"/>
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:src="@drawable/ic_walking"
+                                app:tint="#FFF"
+                                android:layout_marginEnd="4dp"/>
+
+                            <TextView
+                                android:id="@+id/textMotionValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Idling"
+                                android:textColor="#FFF"
+                                android:textStyle="bold"
+                                android:textSize="13sp"/>
+                        </LinearLayout>
+
+                        <GridLayout
+                            android:id="@+id/gridMotion"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:columnCount="2"
+                            android:rowCount="6"
+                            android:alignmentMode="alignMargins"
+                            android:columnOrderPreserved="false">
+
+                            <include layout="@layout/item_motion_button" android:id="@+id/btnWalk" />
+                            <include layout="@layout/item_motion_button" android:id="@+id/btnRaceWalk" />
+
+                            <include layout="@layout/item_motion_button" android:id="@+id/btnUphill" />
+                            <include layout="@layout/item_motion_button" android:id="@+id/btnDownhill" />
+
+                            <include layout="@layout/item_motion_button" android:id="@+id/btnStairsUp" />
+                            <include layout="@layout/item_motion_button" android:id="@+id/btnStairsDown" />
+
+                            <include layout="@layout/item_motion_button" android:id="@+id/btnGravel" />
+                            <include layout="@layout/item_motion_button" android:id="@+id/btnCycling" />
+
+                        </GridLayout>
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Product Tour"
+                    android:textColor="#FFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp"/>
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:padding="16dp"
-                    android:gravity="center_vertical">
+                    android:baselineAligned="false"
+                    android:layout_marginBottom="100dp"> <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="80dp"
+                    android:background="@drawable/bg_product_card"
+                    android:gravity="center_vertical"
+                    android:padding="12dp"
+                    android:layout_marginEnd="8dp">
+
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:src="@drawable/ic_warible"
+                        app:tint="#FFA726"
+                        android:layout_marginEnd="8dp"/>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+                        <TextView android:text="Wearable" android:textColor="#FFF" android:textSize="12sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        <TextView android:text="Instructions" android:textColor="#AAA" android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    </LinearLayout>
+                </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-                        <TextView android:text="Smart Assist AI" android:layout_width="0dp" android:layout_height="0dp" android:textColor="#FFF" android:textStyle="bold" android:textSize="16sp"/>
-                        <TextView android:text="Auto-adjust power based on sensor data." android:layout_width="0dp" android:layout_height="0dp" android:textColor="#AAA" android:textSize="12sp"/>
+                        android:layout_height="80dp"
+                        android:background="@drawable/bg_product_card"
+                        android:gravity="center_vertical"
+                        android:padding="12dp"
+                        android:layout_marginStart="8dp">
+
+                        <ImageView
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:src="@drawable/ic_opetaions"
+                            app:tint="#42A5F5"
+                            android:layout_marginEnd="8dp"/>
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+                            <TextView android:text="Operation" android:textColor="#FFF" android:textSize="12sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                            <TextView android:text="Instructions" android:textColor="#AAA" android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        </LinearLayout>
                     </LinearLayout>
 
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchSmartAssist"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"/>
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
