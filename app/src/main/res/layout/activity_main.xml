@@ -4,8 +4,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:fitsSystemWindows="true"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/my_toolbar"
@@ -14,70 +14,60 @@
         android:background="?attr/viewBackground"
         android:elevation="4dp"
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-        app:layout_constraintStart_toStartOf="parent"
-        app:contentInsetStart="0dp"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:popupTheme="@style/ThemeOverlay.AppCompat.Light">
 
-        <!-- LEFT -->
         <ImageView
+            android:id="@+id/logo_header"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_margin="8dp"
-            android:id="@+id/logo_header"
             android:layout_gravity="start|center_vertical"
-            android:src="@drawable/logo" />
+            android:src="@drawable/logo"
+            android:layout_margin="8dp"/>
 
-        <!-- RIGHT -->
         <LinearLayout
-            android:id="@+id/device_actions"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_margin="8dp"
             android:layout_gravity="end|center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:layout_margin="8dp">
 
             <ImageButton
+                android:id="@+id/reconnect"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:id="@+id/reconnect"
-                android:clickable="true"
-                android:focusable="true"
                 android:padding="15dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/bluetooth_off" />
-
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/device_details"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_margin="8dp"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:id="@+id/device_details"
+            android:layout_margin="8dp">
 
             <TextView
                 android:id="@+id/device_name"
                 android:layout_width="wrap_content"
-                android:textSize="16sp"
+                android:layout_height="wrap_content"
                 android:text="Unknown Device"
                 android:textStyle="bold"
-                android:textColor="?stringColor"
-                android:layout_height="wrap_content" />
+                android:textSize="16sp"
+                android:textColor="?stringColor"/>
 
             <TextView
                 android:id="@+id/device_mac"
                 android:layout_width="wrap_content"
-                android:textSize="12sp"
+                android:layout_height="wrap_content"
                 android:text="AA:BB:CC:DD:EE:FF"
-                android:textColor="?stringColor"
-                android:layout_height="wrap_content" />
-
+                android:textSize="12sp"
+                android:textColor="?stringColor"/>
         </LinearLayout>
-
     </androidx.appcompat.widget.Toolbar>
-
 
     <ImageView
         android:id="@+id/watermark"
@@ -85,31 +75,28 @@
         android:layout_height="0dp"
         android:src="@drawable/brlogo"
         android:alpha="0.2"
-        android:contentDescription="logo_desc"
-            app:layout_constraintWidth_percent="0.7"
-            app:layout_constraintDimensionRatio="1:1"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
+        app:layout_constraintWidth_percent="0.7"
+        app:layout_constraintDimensionRatio="1:1"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
 
     <FrameLayout
         android:id="@+id/fragment_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toTopOf="@+id/bottom_navigation"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="1.0"
+        app:layout_constraintTop_toBottomOf="@+id/my_toolbar"
+        app:layout_constraintBottom_toTopOf="@+id/nav_divider"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="1.0" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <View
         android:id="@+id/nav_divider"
         android:layout_width="match_parent"
-        android:layout_height="2.4dp"
-        android:background="@color/black_5"
-        app:layout_constraintBottom_toTopOf="@id/bottom_navigation"
+        android:layout_height="2dp"
+        android:background="#1A000000"
+        app:layout_constraintBottom_toTopOf="@+id/bottom_navigation"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

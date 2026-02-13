@@ -66,6 +66,14 @@ public class ExoskeletonFragment extends Fragment {
         btnReload = view.findViewById(R.id.btnReload);
         bottomSheet = view.findViewById(R.id.bottomSheet);
 
+        // **FIX:** Initialize sheetBehavior after bottomSheet has been found
+        if (bottomSheet != null) {
+            sheetBehavior = BottomSheetBehavior.from(bottomSheet);
+            sheetBehavior.setHideable(true); // Allow it to be hidden completely
+            sheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN); // Start Hidden
+        }
+
+
         // Sheet Internal Views
         textCurrentMode = view.findViewById(R.id.textCurrentMode);
         textModeHeading = view.findViewById(R.id.textModeHeading);
@@ -73,15 +81,17 @@ public class ExoskeletonFragment extends Fragment {
         textPowerPercent = view.findViewById(R.id.textPowerPercent);
         powerSlider = view.findViewById(R.id.powerSlider);
 
+
         modeButtons = new Button[]{
                 view.findViewById(R.id.btnEco), view.findViewById(R.id.btnTrans),
                 view.findViewById(R.id.btnHyper), view.findViewById(R.id.btnFitness)
         };
 
         // 2. Setup Bottom Sheet Behavior
-        sheetBehavior = BottomSheetBehavior.from(bottomSheet);
-        sheetBehavior.setHideable(true); // Allow it to be hidden completely
-        sheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN); // Start Hidden
+        // Removed duplicate initialization, now done above with null check
+        // sheetBehavior = BottomSheetBehavior.from(bottomSheet);
+        // sheetBehavior.setHideable(true); // Allow it to be hidden completely
+        // sheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN); // Start Hidden
 
         // 3. Connection Observer (The Logic Switch)
         viewModel.isConnected.observe(getViewLifecycleOwner(), connected -> {
@@ -92,7 +102,7 @@ public class ExoskeletonFragment extends Fragment {
                 statusText.setTextColor(Color.GREEN);
 
                 // Show the sheet (Peek mode)
-                if (sheetBehavior.getState() == BottomSheetBehavior.STATE_HIDDEN) {
+                if (sheetBehavior != null && sheetBehavior.getState() == BottomSheetBehavior.STATE_HIDDEN) {
                     sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
                 }
             } else {
@@ -101,7 +111,9 @@ public class ExoskeletonFragment extends Fragment {
                 statusText.setText("Not Connected");
                 statusText.setTextColor(Color.WHITE);
 
-                sheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN);
+                if (sheetBehavior != null) {
+                    sheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN);
+                }
             }
         });
 
@@ -123,6 +135,43 @@ public class ExoskeletonFragment extends Fragment {
             if (fromUser) viewModel.sendCommand("SET_POWER:" + (int)value);
         });
 
+        // 3. Connection Observer (THE FIX)
+        viewModel.isConnected.observe(getViewLifecycleOwner(), connected -> {
+            if (connected) {
+                // CONNECTED:
+                // 1. Disable Hiding: User cannot swipe it off-screen anymore.
+                if (sheetBehavior != null) {
+                    sheetBehavior.setHideable(false);
+
+                    // 2. Force it to Peek (Collapsed) or Expanded, but never Hidden.
+                    if (sheetBehavior.getState() == BottomSheetBehavior.STATE_HIDDEN) {
+                        sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                    }
+                }
+
+
+                // 3. Update UI
+                layoutDisconnected.setVisibility(View.GONE);
+                statusText.setText("Connected - Active");
+                statusText.setTextColor(Color.GREEN);
+
+            } else {
+                // DISCONNECTED:
+                // 1. Enable Hiding: So we can hide it programmatically.
+                if (sheetBehavior != null) {
+                    sheetBehavior.setHideable(true);
+
+                    // 2. Hide it completely.
+                    sheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN);
+                }
+
+                // 3. Update UI
+                layoutDisconnected.setVisibility(View.VISIBLE);
+                statusText.setText("Not Connected");
+                statusText.setTextColor(Color.WHITE);
+            }
+        });
+
         btnChangeDevice.setOnClickListener(v -> startActivity(new Intent(requireContext(), ScanActivity.class)));
 
         btnReload.setOnClickListener(v -> {
@@ -132,18 +181,22 @@ public class ExoskeletonFragment extends Fragment {
     }
 
     private void setupModeButtons() {
-        for (int i = 0; i < modeButtons.length; i++) {
-            final int modeIndex = i;
-            modeButtons[i].setOnClickListener(v -> {
-                currentMode = modeIndex;
-                updateModeUI();
-                viewModel.sendCommand("SET_MODE:" + currentMode);
-            });
+        if (modeButtons != null) {
+            for (int i = 0; i < modeButtons.length; i++) {
+                final int modeIndex = i;
+                modeButtons[i].setOnClickListener(v -> {
+                    currentMode = modeIndex;
+                    updateModeUI();
+                    viewModel.sendCommand("SET_MODE:" + currentMode);
+                });
+            }
         }
     }
 
     private void updateModeUI() {
-        for (int i = 0; i < modeButtons.length; i++) modeButtons[i].setSelected(i == currentMode);
+        if (modeButtons != null) {
+            for (int i = 0; i < modeButtons.length; i++) modeButtons[i].setSelected(i == currentMode);
+        }
 
         switch (currentMode) {
             case MODE_ECO:
