@@ -42,6 +42,10 @@ public class ExoskeletonFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        // ... (Your existing findViewByIds) ...
+        View bottomControls = view.findViewById(R.id.bottomControls); // The container for Add/Reload buttons
+        View navBar = requireActivity().findViewById(R.id.bottom_navigation); // TRY to find Main Nav Bar (if you have one)
+
         statusText = view.findViewById(R.id.statusText);
         container = view.findViewById(R.id.container);
         btnChangeDevice = view.findViewById(R.id.btnChangeDevice);
@@ -113,6 +117,32 @@ public class ExoskeletonFragment extends Fragment {
                 // Send command "SET_VAL:100"
                 viewModel.sendCommand("SET_VAL:" + val);
                 inputCommand.setText(""); // Clear input
+            }
+        });
+
+        // --- NEW: KEYBOARD LISTENER ---
+        // This detects if the keyboard is open by checking if screen height shrank
+        view.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            android.graphics.Rect r = new android.graphics.Rect();
+            view.getWindowVisibleDisplayFrame(r);
+            int screenHeight = view.getRootView().getHeight();
+
+            // If more than 15% of screen is missing, keyboard is probably open
+            int keypadHeight = screenHeight - r.bottom;
+
+            if (keypadHeight > screenHeight * 0.15) {
+                // KEYBOARD IS OPEN -> Hide the bottom stuff
+                bottomControls.setVisibility(View.GONE);
+                if (navBar != null) navBar.setVisibility(View.GONE);
+            } else {
+                // KEYBOARD IS CLOSED -> Show bottom stuff
+
+                // Only show bottomControls if disconnected (based on your logic)
+                if (!Boolean.TRUE.equals(viewModel.isConnected.getValue())) {
+                    bottomControls.setVisibility(View.VISIBLE);
+                }
+
+                if (navBar != null) navBar.setVisibility(View.VISIBLE);
             }
         });
     }

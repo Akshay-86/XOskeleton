@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -127,12 +128,11 @@ public class ExoViewModel extends AndroidViewModel {
     }
 
     // ==========================================
-    //           2. HISTORY LOGIC
+    //           2. HISTORY LOGIC (FIXED)
     // ==========================================
-    // Mode: 0 = Daily (Last 7 Days), 1 = Hourly (Last 24 Hours)
+    // Mode: 0 = Daily (Last 7 Days), 1 = Hourly (Strictly Today)
     public void calculateUsageHistory(int mode) {
         new Thread(() -> {
-            // Access files directory directly to scan logs
             File dir = getApplication().getExternalFilesDir(null);
             if (dir == null || dir.listFiles() == null) return;
 
@@ -140,30 +140,44 @@ public class ExoViewModel extends AndroidViewModel {
             SimpleDateFormat fileFormat = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US);
 
             SimpleDateFormat dayLabel = new SimpleDateFormat("MMM dd", Locale.US); // "Feb 10"
-            SimpleDateFormat hourLabel = new SimpleDateFormat("HH:mm:ss", Locale.US); // "14:00"
+            SimpleDateFormat hourLabel = new SimpleDateFormat("HH:00", Locale.US); // "14:00"
 
-            long now = System.currentTimeMillis();
-            // Filter: 7 days ago or 24 hours ago
-            long cutoff = (mode == 0) ? (now - 7L * 24 * 3600 * 1000) : (now - 24L * 3600 * 1000);
+            // --- NEW: USE CALENDAR FOR PRECISE CUTOFFS ---
+            Calendar cal = Calendar.getInstance();
+            cal.set(Calendar.HOUR_OF_DAY, 0);
+            cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);
+            cal.set(Calendar.MILLISECOND, 0);
+
+            long startOfToday = cal.getTimeInMillis();
+            long cutoff;
+
+            if (mode == 1) {
+                // HOURLY MODE: Strictly ignore anything before 00:00 today
+                cutoff = startOfToday;
+            } else {
+                // DAILY MODE: Today + Previous 6 Days
+                cal.add(Calendar.DAY_OF_YEAR, -6);
+                cutoff = cal.getTimeInMillis();
+            }
 
             for (File f : Objects.requireNonNull(dir.listFiles())) {
                 if (!f.getName().startsWith("Log_")) continue;
 
                 try {
-                    // Extract start time from filename "Log_20260210_101814.csv"
                     String datePart = f.getName().substring(4, 19);
                     Date startDate = fileFormat.parse(datePart);
                     if (startDate == null) continue;
 
                     long start = startDate.getTime();
+
+                    // FILTER: If the file started before our cutoff, SKIP IT.
                     if (start < cutoff) continue;
 
-                    // Duration = Last Modified - Start Time
                     long end = f.lastModified();
                     float durationMinutes = (end - start) / 60000f;
-                    if (durationMinutes < 0.1) durationMinutes = 0.1f; // Minimum visibility
+                    if (durationMinutes < 0.1) durationMinutes = 0.1f;
 
-                    // Grouping
                     String key;
                     if (mode == 0) key = dayLabel.format(startDate);
                     else key = hourLabel.format(startDate);
@@ -174,7 +188,7 @@ public class ExoViewModel extends AndroidViewModel {
                 } catch (Exception ignored) {}
             }
 
-            // Sort keys chronologically
+            // Sort and Post
             List<String> sortedKeys = new ArrayList<>(groupedData.keySet());
             Collections.sort(sortedKeys);
 
