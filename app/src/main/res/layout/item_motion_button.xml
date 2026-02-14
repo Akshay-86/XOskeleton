@@ -3,6 +3,7 @@
     android:layout_width="0dp"
     android:layout_height="wrap_content"
     android:layout_columnWeight="1"
+    android:layout_gravity="fill"
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:padding="12dp"

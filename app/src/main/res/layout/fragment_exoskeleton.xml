@@ -82,93 +82,6 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <View
-                android:layout_width="60dp"
-                android:layout_height="5dp"
-                android:background="@drawable/bg_handle_bar"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginBottom="20dp"/>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="24dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-                    <TextView android:text="Battery" android:textColor="#888" android:layout_width="0dp" android:layout_height="0dp" android:textSize="12sp"/>
-                    <TextView android:text="85% (Charging)" android:textColor="#FFF" android:layout_width="0dp" android:layout_height="0dp" android:textSize="16sp" android:textStyle="bold"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-                    <TextView android:text="Current Mode" android:textColor="#888" android:layout_width="0dp" android:layout_height="0dp" android:textSize="12sp"/>
-                    <TextView android:id="@+id/textCurrentMode" android:text="Eco Mode" android:textColor="#FFF" android:layout_width="0dp" android:layout_height="0dp" android:textSize="16sp" android:textStyle="bold"/>
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:weightSum="4"
-                android:layout_marginBottom="24dp">
-                <androidx.appcompat.widget.AppCompatButton android:id="@+id/btnEco" android:text="Eco" style="@style/ModeButtonStyle"/>
-                <androidx.appcompat.widget.AppCompatButton android:id="@+id/btnTrans" android:text="Trans" style="@style/ModeButtonStyle"/>
-                <androidx.appcompat.widget.AppCompatButton android:id="@+id/btnHyper" android:text="Hyper" style="@style/ModeButtonStyle"/>
-                <androidx.appcompat.widget.AppCompatButton android:id="@+id/btnFitness" android:text="Fit" style="@style/ModeButtonStyle"/>
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/textModeHeading"
-                android:text="Eco Mode"
-                android:textColor="#FFF"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-
-            <TextView
-                android:id="@+id/textModeDesc"
-                android:text="Max battery life with minimal assistance."
-                android:textColor="#AAA"
-                android:textSize="14sp"
-                android:layout_marginBottom="24dp"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-
-            <TextView android:text="Power Adjust" android:textColor="#FFF" android:textStyle="bold" android:layout_marginBottom="8dp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="24dp">
-
-                <TextView
-                    android:id="@+id/textPowerPercent"
-                    android:layout_width="50dp"
-                    android:layout_height="wrap_content"
-                    android:text="30%"
-                    android:textColor="#00E5FF"
-                    android:textSize="18sp"
-                    android:textStyle="bold"/>
-
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/powerSlider"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:valueFrom="0"
-                    android:valueTo="100"
-                    android:value="30"
-                    style="@style/ModernSlider"/>
-            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -201,85 +114,217 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="12dp">
+                            android:layout_marginBottom="24dp">
 
-                            <TextView
+                            <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_weight="1"
                                 android:layout_height="wrap_content"
-                                android:text="Adaptive Motion Recognition"
-                                android:textColor="#FFF"
-                                android:textSize="16sp"
-                                android:textStyle="bold"/>
+                                android:orientation="vertical">
+                                <TextView android:text="Battery" android:textColor="#888" android:layout_width="0dp" android:layout_height="0dp" android:textSize="12sp"/>
+                                <TextView android:text="85% (Charging)" android:textColor="#FFF" android:layout_width="0dp" android:layout_height="0dp" android:textSize="16sp" android:textStyle="bold"/>
+                            </LinearLayout>
 
-                            <com.google.android.material.switchmaterial.SwitchMaterial
-                                android:id="@+id/switchSmartAssist"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"/>
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical">
+                                <TextView android:text="Current Mode" android:textColor="#888" android:layout_width="0dp" android:layout_height="0dp" android:textSize="12sp"/>
+                                <TextView android:id="@+id/textCurrentMode" android:text="Eco Mode" android:textColor="#FFF" android:layout_width="0dp" android:layout_height="0dp" android:textSize="16sp" android:textStyle="bold"/>
+                            </LinearLayout>
                         </LinearLayout>
 
                         <LinearLayout
-                            android:id="@+id/statusMotionBar"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:background="@drawable/bg_status_bar_gray"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="12dp"
-                            android:paddingVertical="8dp"
+                            android:weightSum="4"
+                            android:layout_marginBottom="24dp">
+                            <androidx.appcompat.widget.AppCompatButton android:id="@+id/btnEco" android:text="Eco" style="@style/ModeButtonStyle"/>
+                            <androidx.appcompat.widget.AppCompatButton android:id="@+id/btnTrans" android:text="Trans" style="@style/ModeButtonStyle"/>
+                            <androidx.appcompat.widget.AppCompatButton android:id="@+id/btnHyper" android:text="Hyper" style="@style/ModeButtonStyle"/>
+                            <androidx.appcompat.widget.AppCompatButton android:id="@+id/btnFitness" android:text="Fit" style="@style/ModeButtonStyle"/>
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/textModeHeading"
+                            android:text="Eco Mode"
+                            android:textColor="#FFF"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+
+                        <TextView
+                            android:id="@+id/textModeDesc"
+                            android:text="Max battery life with minimal assistance."
+                            android:textColor="#AAA"
+                            android:textSize="14sp"
+                            android:layout_marginBottom="24dp"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+
+                        <TextView android:text="Power Adjust" android:textColor="#FFF" android:textStyle="bold" android:layout_marginBottom="8dp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
                             android:gravity="center_vertical"
-                            android:layout_marginBottom="16dp">
+                            android:layout_marginBottom="24dp">
 
                             <TextView
+                                android:id="@+id/textPowerPercent"
+                                android:layout_width="50dp"
+                                android:layout_height="wrap_content"
+                                android:text="30%"
+                                android:textColor="#00E5FF"
+                                android:textSize="18sp"
+                                android:textStyle="bold"/>
+
+                            <com.google.android.material.slider.Slider
+                                android:id="@+id/powerSlider"
                                 android:layout_width="0dp"
                                 android:layout_weight="1"
                                 android:layout_height="wrap_content"
-                                android:text="Active Motion Status:"
-                                android:textColor="#AAA"
-                                android:textSize="12sp"/>
-
-                            <ImageView
-                                android:layout_width="16dp"
-                                android:layout_height="16dp"
-                                android:src="@drawable/ic_walking"
-                                app:tint="#FFF"
-                                android:layout_marginEnd="4dp"/>
-
-                            <TextView
-                                android:id="@+id/textMotionValue"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Idling"
-                                android:textColor="#FFF"
-                                android:textStyle="bold"
-                                android:textSize="13sp"/>
+                                android:valueFrom="0"
+                                android:valueTo="100"
+                                android:value="30"
+                                style="@style/ModernSlider"/>
                         </LinearLayout>
-
-                        <GridLayout
-                            android:id="@+id/gridMotion"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:columnCount="2"
-                            android:rowCount="6"
-                            android:alignmentMode="alignMargins"
-                            android:columnOrderPreserved="false">
-
-                            <include layout="@layout/item_motion_button" android:id="@+id/btnWalk" />
-                            <include layout="@layout/item_motion_button" android:id="@+id/btnRaceWalk" />
-
-                            <include layout="@layout/item_motion_button" android:id="@+id/btnUphill" />
-                            <include layout="@layout/item_motion_button" android:id="@+id/btnDownhill" />
-
-                            <include layout="@layout/item_motion_button" android:id="@+id/btnStairsUp" />
-                            <include layout="@layout/item_motion_button" android:id="@+id/btnStairsDown" />
-
-                            <include layout="@layout/item_motion_button" android:id="@+id/btnGravel" />
-                            <include layout="@layout/item_motion_button" android:id="@+id/btnCycling" />
-
-                        </GridLayout>
-
                     </LinearLayout>
+
                 </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#1E1E1E"
+                app:strokeColor="#333"
+                app:strokeWidth="1dp"
+                app:cardCornerRadius="24dp"
+                android:layout_marginBottom="24dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Adaptive Motion Recognition"
+                            android:textColor="#FFF"
+                            android:textSize="16sp"
+                            android:textStyle="bold"/>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchSmartAssist"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/statusMotionBar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_status_bar_gray"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="8dp"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="16dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Active Motion Status:"
+                            android:textColor="#AAA"
+                            android:textSize="12sp"/>
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_walking"
+                            app:tint="#FFF"
+                            android:layout_marginEnd="4dp"/>
+
+                        <TextView
+                            android:id="@+id/textMotionValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Idling"
+                            android:textColor="#FFF"
+                            android:textStyle="bold"
+                            android:textSize="13sp"/>
+                    </LinearLayout>
+
+                    <GridLayout
+                        android:id="@+id/gridMotion"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:columnCount="2"
+                        android:rowCount="6"
+                        android:alignmentMode="alignMargins"
+                        android:columnOrderPreserved="false">
+
+                        <include layout="@layout/item_motion_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_columnWeight="1"
+                            android:id="@+id/btnWalk"/>
+                        <include layout="@layout/item_motion_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_columnWeight="1"
+                            android:id="@+id/btnRaceWalk" />
+
+                        <include layout="@layout/item_motion_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_columnWeight="1"
+                            android:id="@+id/btnUphill" />
+                        <include layout="@layout/item_motion_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_columnWeight="1"
+                            android:id="@+id/btnDownhill" />
+
+                        <include layout="@layout/item_motion_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_columnWeight="1"
+                            android:id="@+id/btnStairsUp" />
+                        <include layout="@layout/item_motion_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_columnWeight="1"
+                            android:id="@+id/btnStairsDown" />
+
+                        <include layout="@layout/item_motion_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_columnWeight="1"
+                            android:id="@+id/btnGravel" />
+                        <include layout="@layout/item_motion_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_columnWeight="1"
+                            android:id="@+id/btnCycling" />
+
+                    </GridLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -315,8 +360,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:orientation="vertical">
-                        <TextView android:text="Wearable" android:textColor="#FFF" android:textSize="12sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                        <TextView android:text="Instructions" android:textColor="#AAA" android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        <TextView android:text="Wearable" android:textColor="#FFF" android:textSize="12sp" android:layout_width="0dp" android:layout_height="0dp"/>
+                        <TextView android:text="Instructions" android:textColor="#AAA" android:textSize="11sp" android:layout_width="0dp" android:layout_height="0dp"/>
                     </LinearLayout>
                 </LinearLayout>
 
@@ -340,14 +385,12 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:orientation="vertical">
-                            <TextView android:text="Operation" android:textColor="#FFF" android:textSize="12sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                            <TextView android:text="Instructions" android:textColor="#AAA" android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                            <TextView android:text="Operation" android:textColor="#FFF" android:textSize="12sp" android:layout_width="0dp" android:layout_height="0dp"/>
+                            <TextView android:text="Instructions" android:textColor="#AAA" android:textSize="11sp" android:layout_width="0dp" android:layout_height="0dp"/>
                         </LinearLayout>
                     </LinearLayout>
 
                 </LinearLayout>
-
-            </LinearLayout>
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
